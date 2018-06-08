@@ -2,17 +2,17 @@
 
 package = "luawinapi"
 
-version = "1.2.0-1"
+version = "1.3.0-1"
 
 -- LuaDist source
 source = {
-  tag = "1.2.0-1",
+  tag = "1.3.0-1",
   url = "git://github.com/LuaDist-testing/luawinapi.git"
 }
 -- Original source
 -- source = {
 --     url = "git://github.com/oberhofer/luawinapi.git",
---     tag = "v1.2.0"
+--     tag = "v1.3.0"
 -- }
 
 description = {
@@ -26,7 +26,7 @@ description = {
 
 dependencies = {
   "lua >= 5.1",
-  "luacwrap ~> 1.2",
+  "luacwrap ~> 1.3",
   "bit32"
 }
 
@@ -35,13 +35,13 @@ local function make_plat(plat)
   local defines = {
     win32 = {
      "WIN32", "NDEBUG", "_WINDOWS", "_USRDLL", 
-	 "WINVER=0x0600", 
+     "WINVER=0x0600", 
      "_WIN32_WINNT=0x0600", 
      "_WIN32_IE=0x0600"
     },
     mingw32 = {
      "WIN32", "NDEBUG", "_WINDOWS", "_USRDLL", 
-	 "WINVER=0x0600", 
+     "WINVER=0x0600", 
      "_WIN32_WINNT=0x0600", 
      "_WIN32_IE=0x0600"
     }

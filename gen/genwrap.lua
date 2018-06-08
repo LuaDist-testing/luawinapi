@@ -12,7 +12,6 @@ require("templateengine")
 
 dofile("parse.lua")
 
-
 -- basic type IDs
 basic_types = {
   ["INT8"]       = "$i8",
@@ -21,6 +20,12 @@ basic_types = {
   ["UINT16"]     = "$u16",
   ["INT32"]      = "$i32",
   ["UINT32"]     = "$u32",
+  
+  ["INT"]        = "$int",
+  ["UINT"]       = "$uint",
+  ["ULONG"]      = "$ulong",
+  ["LONG"]       = "$long",
+  
   ["POINTER"]    = "$ptr",
 
   ["LPCSTR"]     = "$ptr",
@@ -59,10 +64,14 @@ type_aliases = {
   ["INT"]       = "INT32",
 
   ["DWORD"]     = "UINT32",
-  ["UINT"]      = "UINT32",
-  ["ULONG"]     = "UINT32",
 
-  ["LRESULT"]   = "UINT32",
+  ["BOOL"]      = "INT",
+  ["long"]      = "LONG",
+  ["int"]       = "INT",
+
+  ["HRESULT"]   = "ULONG",
+  
+  ["LRESULT"]   = "ULONG",
 
   ["UINT_PTR"]  = "POINTER",
   ["LONG_PTR"]  = "POINTER",
@@ -76,7 +85,7 @@ type_aliases = {
 
   ["LPINT"]     = "POINTER",
 
-  ["ATOM"]      = "POINTER",
+  ["ATOM"]      = "UINT16",
 
 -- ["HANDLE"]    = "POINTER",
 
@@ -158,6 +167,26 @@ marshall_fragments =
     ["in"]  = "$name = ($type)lua_tonumber(L, $index);",
     ["out"] = "lua_pushnumber(L, $name); ++numret;"
   },
+  ["INT"] = {
+
+    ["in"]  = "$name = ($type)lua_tonumber(L, $index);",
+    ["out"] = "lua_pushnumber(L, $name); ++numret;"
+  },
+  ["UINT"] = {
+
+    ["in"]  = "$name = ($type)lua_tonumber(L, $index);",
+    ["out"] = "lua_pushnumber(L, $name); ++numret;"
+  },
+  ["LONG"] = {
+
+    ["in"]  = "$name = ($type)lua_tonumber(L, $index);",
+    ["out"] = "lua_pushnumber(L, $name); ++numret;"
+  },
+  ["ULONG"] = {
+
+    ["in"]  = "$name = ($type)lua_tonumber(L, $index);",
+    ["out"] = "lua_pushnumber(L, $name); ++numret;"
+  },
   ["INT_PTR"] = {
 
     ["in"]  = "$name = ($type)lua_tonumber(L, $index);",
@@ -184,7 +213,6 @@ marshall_fragments =
   ["HANDLE"] = {
 
     ["in"]  = "$name = ($type)lua_tohandle(L, $index);",
---    ["out"] = "lua_pushlightuserdata(L, (PVOID)$name);"
     ["out"] = "lua_pushlightuserdata(L, (PVOID)$name); ++numret;"
   },
   ["WNDPROC"] = {

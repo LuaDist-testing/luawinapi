@@ -1,7 +1,7 @@
 //////////////////////////////////////////////////////////////////////////
 //
 // luawinapi - winapi wrapper for Lua
-// Copyright (C) 2011 Klaus Oberhofer. See copyright notice in
+// Copyright (C) 2011-2016 Klaus Oberhofer. See copyright notice in
 // LICENSE file
 //
 //////////////////////////////////////////////////////////////////////////
@@ -18,7 +18,7 @@
 #define LUAWINAPI_API __declspec(dllexport)
 #endif
 
-extern int register_winapi(lua_State *L);
+extern int register_luawinapi(lua_State *L);
 extern int register_EnumChildWindows(lua_State* L);
 
 // luacwrap c interface
@@ -72,7 +72,7 @@ LUAWINAPI_API int luaopen_luawinapi_core(lua_State *L)
   lua_pushstring(L, "Klaus Oberhofer");
   lua_setfield(L, -2, "_AUTHOR");
 
-  lua_pushstring(L, "1.2.0-1");
+  lua_pushstring(L, "1.3.0-1");
   lua_setfield(L, -2, "_VERSION");
 
   lua_pushstring(L, "MIT license: See LICENSE for details.");
@@ -82,7 +82,7 @@ LUAWINAPI_API int luaopen_luawinapi_core(lua_State *L)
   lua_setfield(L, -2, "_URL");
   
   // register package functionality
-  register_winapi(L);
+  register_luawinapi(L);
 
   register_EnumChildWindows(L);
 
