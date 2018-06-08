@@ -28,6 +28,13 @@
 #include "gen_structs.h"
 #include "gen_abstractions.h"
 
+// luacwrap c interface
+extern luacwrap_cinterface* g_luacwrapiface;
+
+// TODO: type descriptors for OS specific types (like INT_PTR, LRESULT) to enable
+// expressions like #winapi.LRESULT
+
+
 // array type descriptors
 //#for name, arr in pairs(arraydefs) do
 //#  local basic_type = basic_types[result] or basic_alias
@@ -81,9 +88,51 @@ int lua_tolwparam( lua_State *L, int idx )
       v = lua_tointeger(L, idx);
     }
     break;
+    case LUA_TNONE:
+    case LUA_TNIL:
+      // accept none and nil
+    break;
+    default:
+    {
+      const char *msg = lua_pushfstring(L, "LPARAM or WPARAM expected but got %s", luaL_typename(L, idx));
+      luaL_argerror(L, idx, msg);
+    } 
+    break;
   }
   return v;
 } 
+
+LPCWSTR lua_tostring_or_atom( lua_State *L, int idx )
+{
+  LPCWSTR v = 0;
+  switch (lua_type(L, idx))
+  {
+    // case LUA_TLIGHTUSERDATA:
+    // case LUA_TUSERDATA:
+    // {
+    //   v = (LPCWSTR)lua_touserdata(L, idx);
+    // }
+    // break;
+    case LUA_TSTRING:
+    {
+      v = (LPCWSTR)lua_tostring(L, idx);
+    }
+    break;
+    case LUA_TNUMBER:
+    {
+      v = (LPCWSTR)lua_tointeger(L, idx);
+    }
+    break;
+    default:
+    {
+      const char *msg = lua_pushfstring(L, "LPCWSTR or ATOM expected but got %s", luaL_typename(L, idx));
+      luaL_argerror(L, idx, msg);
+    } 
+    break;
+  }
+  return v;
+} 
+
 
 int lua_tohandle( lua_State *L, int idx )
 {
@@ -100,6 +149,16 @@ int lua_tohandle( lua_State *L, int idx )
     {
       v = lua_tointeger(L, idx);
     }
+    break;
+    case LUA_TNONE:
+    case LUA_TNIL:
+      // accept none and nil
+    break;
+    default:
+    {
+      const char *msg = lua_pushfstring(L, "HANDLE (number or userdata) expected but got %s", luaL_typename(L, idx));
+      luaL_argerror(L, idx, msg);
+    } 
     break;
   }
   return v;
@@ -120,18 +179,45 @@ int lua_toresourceref( lua_State *L, int idx )
       v = lua_tointeger(L, idx);
     }
     break;
+    case LUA_TNONE:
+    case LUA_TNIL:
+      // accept none and nil
+    break;
+    default:
+    {
+      const char *msg = lua_pushfstring(L, "RESOURCEREF (number or string) expected but got %s", luaL_typename(L, idx));
+      luaL_argerror(L, idx, msg);
+    } 
+    break;
   }
   return v;
 } 
 
-#define LUA_WIN32GUI_LIBNAME "$(libname)"
-#define LUA_WIN32GUI_VERSION "$(libname) version $(libversion)"
+//////////////////////////////////////////////////////////////////////////
+/**
 
-int luawrap_version( lua_State *L )
+  helper functions to get pointer to DefDlgProc and DefWindowProc
+
+*/////////////////////////////////////////////////////////////////////////
+
+static int winapi_GetDefDlgProcW(lua_State* L)
 {
-  lua_pushstring( L, LUA_WIN32GUI_VERSION);
+  lua_pushlightuserdata(L,DefDlgProcW);
   return 1;
 }
+
+static int winapi_GetDefWindowProcW(lua_State* L)
+{
+  lua_pushlightuserdata(L,DefWindowProcW);
+  return 1;
+}
+
+//////////////////////////////////////////////////////////////////////////
+/**
+
+  helper functions to process messages (msg loop implementation)
+
+*/////////////////////////////////////////////////////////////////////////
 
 int winapi_ProcessMessages( lua_State *L )
 {
@@ -145,6 +231,13 @@ int winapi_ProcessMessages( lua_State *L )
   lua_pushnumber(L, msg.wParam);
   return 1;
 }
+
+//////////////////////////////////////////////////////////////////////////
+/**
+
+  generated wrappers
+
+*/////////////////////////////////////////////////////////////////////////
 
 //#  for _, func in ipairs(funcdefs) do
 //#     prerequisite_begin(func, _put)
@@ -180,13 +273,13 @@ int winapi_$(func.name)( lua_State *L )
     );
 //# if (func.rettype ~= "VOID") then
 
-  // marshal retval  
+  // marshal retval
   $(marshal_param(func.rettype, "out", "retval", nil))
 //# end
 //# for _, param in ipairs(func.params) do
-//#   if (param.out) then
+//#   if (param.attribs and param.attribs.out) then
 
-  // marshal $(param.typ)
+  // TODO: marshal $(param.typ)
 //# end
 //# end
 
@@ -196,11 +289,9 @@ int winapi_$(func.name)( lua_State *L )
 //#     prerequisite_end(func, _put)
 //#  end
 
-static const luaL_reg module_lib[ ] = {
-  { "version"           , luawrap_version },
-//  { "unittestPrepare"   , luawrap_unittestPrepare },
-//  { "unittestPrintStructA"   , luawrap_unittestPrintStructA },
-
+static const luaL_Reg module_lib[ ] = {
+  { "GetDefDlgProcW"    , winapi_GetDefDlgProcW  },
+  { "GetDefWindowProcW" , winapi_GetDefWindowProcW },
   { "ProcessMessages"   , winapi_ProcessMessages },
 
 //#  for _, func in ipairs(funcdefs) do
@@ -211,6 +302,7 @@ static const luaL_reg module_lib[ ] = {
   
   { NULL, NULL }
 };
+
 
 //////////////////////////////////////////////////////////////////////////
 /**
@@ -226,17 +318,21 @@ int register_$(libname)(lua_State *L)
   int M = lua_gettop(L);
 
   // register package functions
-  luaL_register( L, NULL, module_lib );
+#if (LUA_VERSION_NUM > 501)
+  luaL_setfuncs(L, module_lib, 0);
+#else
+  luaL_openlib(L, NULL, module_lib, 0);
+#endif
 
   // register array types
 //#for name, arr in pairs(arraydefs) do
-  luacwrap_registertype(L, M, &regType_$(name).hdr);
+  g_luacwrapiface->registertype(L, M, &regType_$(name).hdr);
 //#end
   
   // register structure types
 //#for _, struct in pairs(structdefs) do
 //#     prerequisite_begin(struct, _put)
-  luacwrap_registertype(L, M, &regType_$(struct.name).hdr);
+  g_luacwrapiface->registertype(L, M, &regType_$(struct.name).hdr);
 //#     prerequisite_end(struct, _put)
 //#end
 

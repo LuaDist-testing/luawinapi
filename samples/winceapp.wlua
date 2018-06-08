@@ -1,14 +1,14 @@
 --[==[
 
   luawinapi - winapi wrapper for Lua
-  Copyright (C) 2011 Klaus Oberhofer. See copyright notice in
+  Copyright (C) 2011-2016 Klaus Oberhofer. See copyright notice in
   LICENSE file
 
   Simple test application for luawinapi under WindowsCE
 
 --]==]
 
-winapi = require("winapi")
+winapi = require("luawinapi")
 
 -- should be set under WindowsCE
 if (not UNDER_CE) then

@@ -27,6 +27,7 @@ typedef struct
   lua_State* L;
   int        objectRef;
   int        functionRef;
+  int        errFuncRef;
   PVOID      pThunk;
   WNDPROC    prevProc;
 } WndProcThunk;
@@ -41,27 +42,34 @@ static int winapi_WndProc_gc(lua_State* L);
 static int winapi_WndProc_index(lua_State* L);
 
 
-static const luaL_reg g_mtWndProc[] = {
+static const luaL_Reg g_mtWndProc[] = {
   { "__gc",    winapi_WndProc_gc },
   { "__index", winapi_WndProc_index },
   { NULL, NULL }
 };
 
-static const luaL_reg g_WndProc_methods[ ] = {
+static const luaL_Reg g_WndProc_methods[ ] = {
   { "new",      winapi_WndProc_new },
   { "subclass", winapi_WndProc_subclass },
   { NULL, NULL }
 };
 
 
+//////////////////////////////////////////////////////////////////////////
+/**
 
-static void printMsgProcError(lua_State* L, const char* errormsg, HWND hwnd, UINT Msg, WPARAM wParam, LPARAM lParam)
+  Handle errors occurred while handling messages
+
+*/////////////////////////////////////////////////////////////////////////
+static void raiseMsgProcError(WndProcThunk* thunk, const char* errormsg, HWND hwnd, UINT Msg, WPARAM wParam, LPARAM lParam)
 {
+  lua_State* L = thunk->L;
+  
   LUASTACK_SET(L);
 
   if (lua_checkstack(L, 6))
   {
-    lua_getglobal(L, "printMsgProcError");
+    lua_rawgeti(L, LUA_REGISTRYINDEX, thunk->errFuncRef);
     if (lua_isfunction(L, -1))
     {
       // push parameters and
@@ -76,6 +84,8 @@ static void printMsgProcError(lua_State* L, const char* errormsg, HWND hwnd, UIN
     }
     else
     {
+      luaL_error(L, "Raising MSGPROC error failed. No error function available.\n%s", errormsg);
+    
       // pop function
       lua_pop(L, 1);
     }
@@ -108,7 +118,7 @@ static BOOL WINAPI staticWndProc(WndProcThunk* thunk, HWND hwnd, UINT Msg, WPARA
 
   if (NULL == thunk->pThunk)
   {
-    printMsgProcError(L, "WndProc: Called already released thunk"
+    raiseMsgProcError(thunk, "WndProc: Called already released thunk"
                        , hwnd, Msg, wParam, lParam);
     result = DefWindowProcW(hwnd, Msg, wParam, lParam);
   }
@@ -117,7 +127,7 @@ static BOOL WINAPI staticWndProc(WndProcThunk* thunk, HWND hwnd, UINT Msg, WPARA
     if (!lua_checkstack(L, 7))
     {
       // An error happened, print it and call default window proc
-      printMsgProcError(L, "WndProc: Growing Lua stack failed\n"
+      raiseMsgProcError(thunk, "WndProc: Growing Lua stack failed\n"
                          , hwnd, Msg, wParam, lParam);
       callPrevProc = 1;
     }
@@ -147,7 +157,7 @@ static BOOL WINAPI staticWndProc(WndProcThunk* thunk, HWND hwnd, UINT Msg, WPARA
         // push objectref
         lua_rawgeti(L, LUA_REGISTRYINDEX, thunk->objectRef);
 
-        // push precProc pointer
+        // push prevProc pointer
         lua_pushlightuserdata(L, thunk->prevProc);
      
         ret = lua_pcall(L, 6, 1, -8);
@@ -163,7 +173,7 @@ static BOOL WINAPI staticWndProc(WndProcThunk* thunk, HWND hwnd, UINT Msg, WPARA
             {
               char szError[1024];
               sprintf(szError, "WndProc: got unsupported value type '%s'\n", luaL_typename(L, -1));
-              printMsgProcError(L, szError
+              raiseMsgProcError(thunk, szError
                                  , hwnd, Msg, wParam, lParam);
               callPrevProc = 1;
             }
@@ -175,20 +185,22 @@ static BOOL WINAPI staticWndProc(WndProcThunk* thunk, HWND hwnd, UINT Msg, WPARA
         }
         else
         {
-          // An error happened, print it and call default window proc
-          printMsgProcError(L, lua_tostring(L, -1)
+          const char* errmsg = lua_tostring(L, -1);
+          
+          // An error happened, call raiseMsgProcError
+          raiseMsgProcError(thunk, errmsg
                              , hwnd, Msg, wParam, lParam);
 
           // pop error
           lua_pop(L, 1);
 
-          result = CallWindowProcW(thunk->prevProc, hwnd, Msg, wParam, lParam);
+          callPrevProc = 1;
         }
       }
       else
       {
-        // An error happened, print it and call default window proc
-        printMsgProcError(L, "WndProc: could not get associated function\n"
+        // An error happened, call raiseMsgProcError
+        raiseMsgProcError(thunk, "WndProc: could not get associated function\n"
                            , hwnd, Msg, wParam, lParam);
 
         // pop function
@@ -224,6 +236,8 @@ static int winapi_WndProc_new(lua_State* L)
 
   if (lua_isfunction(L, 2))
   {
+    int errfuncspecified = !lua_isnoneornil(L, 3);
+  
     WndProcThunk* thunk = (WndProcThunk*)lua_newuserdata(L, sizeof(WndProcThunk));
     if (thunk)
     {
@@ -234,20 +248,34 @@ static int winapi_WndProc_new(lua_State* L)
       // register lua object in registry
       lua_pushvalue(L, 1);
       thunk->objectRef    = luaL_ref(L, LUA_REGISTRYINDEX);
+
       // register lua function in registry
+      luaL_checktype(L, 2, LUA_TFUNCTION); 
       lua_pushvalue(L, 2);
       thunk->functionRef  = luaL_ref(L, LUA_REGISTRYINDEX);
+
+      // register error function in registry
+      thunk->errFuncRef   = LUA_REFNIL;
+      if (errfuncspecified)
+      { 
+        luaL_checktype(L, 3, LUA_TFUNCTION); 
+        
+        lua_pushvalue(L, 3);
+        thunk->errFuncRef   = luaL_ref(L, LUA_REGISTRYINDEX);
+      }
+
       thunk->L            = L;
       thunk->pThunk       = stdcallthunk_create(&staticWndProc, thunk);
       thunk->prevProc     = &DefWindowProcW;
-
+      
       LUASTACK_CLEAN(L, 1);
       return 1;
     }
   }
   else
   {
-    luaL_typerror(L, 2, lua_typename(L, LUA_TFUNCTION));
+    const char *msg = lua_pushfstring(L, "function expected but got %s", luaL_typename(L, 2));
+    luaL_argerror(L, 2, msg);
   }
 
   LUASTACK_CLEAN(L, 0);
@@ -272,7 +300,8 @@ static int winapi_WndProc_subclass(lua_State* L)
     hwnd = lua_toWindow(L, 1);
     if (!IsWindow(hwnd))
     {
-      luaL_typerror(L, 1, "Window (handle)");
+      const char *msg = lua_pushfstring(L, "Window (handle) expected but got %s", luaL_typename(L, 1));
+      luaL_argerror(L, 1, msg);
     }
 
     thunk = (WndProcThunk*)lua_newuserdata(L, sizeof(WndProcThunk));
@@ -285,13 +314,24 @@ static int winapi_WndProc_subclass(lua_State* L)
       // register lua object in registry
       lua_pushvalue(L, 2);
       thunk->objectRef    = luaL_ref(L, LUA_REGISTRYINDEX);
+     
       // register lua function in registry
+      luaL_checktype(L, 3, LUA_TFUNCTION); 
       lua_pushvalue(L, 3);
       thunk->functionRef  = luaL_ref(L, LUA_REGISTRYINDEX);
+
+      thunk->errFuncRef   = LUA_REFNIL;
+      if (!lua_isnil(L, 4))
+      {      
+        luaL_checktype(L, 3, LUA_TFUNCTION); 
+        lua_pushvalue(L, 4);
+        thunk->errFuncRef   = luaL_ref(L, LUA_REGISTRYINDEX);
+      }
+
       thunk->L            = L;
       thunk->pThunk       = stdcallthunk_create(&staticWndProc, thunk);
       thunk->prevProc     = (WNDPROC)GetWindowLong(hwnd, GWL_WNDPROC);
-
+      
       // subclass
       SetWindowLong(hwnd, GWL_WNDPROC, (LONG)thunk->pThunk);
 
@@ -301,7 +341,8 @@ static int winapi_WndProc_subclass(lua_State* L)
   }
   else
   {
-    luaL_typerror(L, 3, lua_typename(L, LUA_TFUNCTION));
+    const char *msg = lua_pushfstring(L, "function expected but got %s", luaL_typename(L, 3));
+    luaL_argerror(L, 3, msg);
   }
 
   LUASTACK_CLEAN(L, 0);
@@ -331,9 +372,11 @@ static int winapi_WndProc_gc(lua_State *L)
 
     // remove registered lua object and function
     luaL_unref(L, LUA_REGISTRYINDEX, thunk->objectRef);
-    thunk->functionRef = LUA_REFNIL;
+    thunk->objectRef = LUA_REFNIL;
     luaL_unref(L, LUA_REGISTRYINDEX, thunk->functionRef);
     thunk->functionRef = LUA_REFNIL;
+    luaL_unref(L, LUA_REGISTRYINDEX, thunk->errFuncRef);
+    thunk->errFuncRef = LUA_REFNIL;
   }
 
   LUASTACK_CLEAN(L, 0);
@@ -394,12 +437,20 @@ int winapi_RegisterWndProc(lua_State* L)
 
   // create metatable for WndProc objects and store it in registry
   luaL_newmetatable(L, WndProc_Typename);
-  luaL_register(L, NULL, g_mtWndProc);
+#if (LUA_VERSION_NUM > 501)
+  luaL_setfuncs(L, g_mtWndProc, 0);
+#else
+  luaL_openlib(L, NULL, g_mtWndProc, 0);
+#endif
   lua_pop(L, 1);
 
   // create method table
   lua_newtable(L);
-  luaL_register(L, NULL, g_WndProc_methods);
+#if (LUA_VERSION_NUM > 501)
+  luaL_setfuncs(L, g_WndProc_methods, 0);
+#else
+  luaL_openlib(L, NULL, g_WndProc_methods, 0);
+#endif
 
   // store
   lua_setfield(L, -2, WndProc_Typename);

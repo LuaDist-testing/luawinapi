@@ -1,11 +1,19 @@
+-- This file was automatically generated for the LuaDist project.
+
 package = "luawinapi"
 
-version = "scm-1"
+version = "1.2.0-1"
 
+-- LuaDist source
 source = {
-    url    = "git://github.com/oberhofer/luawinapi.git",
-    branch = "master"
+  tag = "1.2.0-1",
+  url = "git://github.com/LuaDist-testing/luawinapi.git"
 }
+-- Original source
+-- source = {
+--     url = "git://github.com/oberhofer/luawinapi.git",
+--     tag = "v1.2.0"
+-- }
 
 description = {
     summary = "Wraps subset of WinAPI",

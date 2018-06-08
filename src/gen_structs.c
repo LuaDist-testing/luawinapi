@@ -28,14 +28,30 @@
 #include "gen_structs.h"
 #include "gen_abstractions.h"
 
+// luacwrap c interface
+extern luacwrap_cinterface* g_luacwrapiface;
+
+// TODO: type descriptors for OS specific types (like INT_PTR, LRESULT) to enable
+// expressions like #winapi.LRESULT
+
+
 // array type descriptors
-static struct luacwrap_ArrayType regType_UINT8_32 =
+static struct luacwrap_ArrayType regType_UINT8_8 =
 {
   LUACWRAP_TC_ARRAY,
-  "UINT8_32",
-  32,
+  "UINT8_8",
+  8,
   sizeof(UINT8),
   "$u8"
+};
+
+static struct luacwrap_ArrayType regType_UINT16_80 =
+{
+  LUACWRAP_TC_ARRAY,
+  "UINT16_80",
+  80,
+  sizeof(UINT16),
+  "$u16"
 };
 
 static struct luacwrap_ArrayType regType_UINT16_128 =
@@ -47,6 +63,15 @@ static struct luacwrap_ArrayType regType_UINT16_128 =
   "$u16"
 };
 
+static struct luacwrap_ArrayType regType_UINT8_32 =
+{
+  LUACWRAP_TC_ARRAY,
+  "UINT8_32",
+  32,
+  sizeof(UINT8),
+  "$u8"
+};
+
 static struct luacwrap_ArrayType regType_UINT16_32 =
 {
   LUACWRAP_TC_ARRAY,
@@ -54,15 +79,6 @@ static struct luacwrap_ArrayType regType_UINT16_32 =
   32,
   sizeof(UINT16),
   "$u16"
-};
-
-static struct luacwrap_ArrayType regType_UINT8_8 =
-{
-  LUACWRAP_TC_ARRAY,
-  "UINT8_8",
-  8,
-  sizeof(UINT8),
-  "$u8"
 };
 
 
@@ -134,16 +150,21 @@ static luacwrap_RecordMember s_memberLVGROUPMETRICS[] =
 LUACWRAP_DEFINESTRUCT(winapi, LVGROUPMETRICS);
 #endif
 
-static luacwrap_RecordMember s_memberPROCESS_INFORMATION[] =
+static luacwrap_RecordMember s_memberHDITEMW[] =
 {
-  { "hProcess", offsetof(PROCESS_INFORMATION, hProcess), "$ptr"},
-  { "hThread", offsetof(PROCESS_INFORMATION, hThread), "$ptr"},
-  { "dwProcessId", offsetof(PROCESS_INFORMATION, dwProcessId), "$u32"},
-  { "dwThreadId", offsetof(PROCESS_INFORMATION, dwThreadId), "$u32"},
+  { "mask", offsetof(HDITEMW, mask), "$u32"},
+  { "cxy", offsetof(HDITEMW, cxy), "$i32"},
+  { "pszText", offsetof(HDITEMW, pszText), "$ptr"},
+  { "hbm", offsetof(HDITEMW, hbm), "$ptr"},
+  { "cchTextMax", offsetof(HDITEMW, cchTextMax), "$i32"},
+  { "fmt", offsetof(HDITEMW, fmt), "$i32"},
+  { "lParam", offsetof(HDITEMW, lParam), "$u32"},
+  { "iImage", offsetof(HDITEMW, iImage), "$i32"},
+  { "iOrder", offsetof(HDITEMW, iOrder), "$i32"},
   { NULL, 0 }
 };
 
-LUACWRAP_DEFINESTRUCT(winapi, PROCESS_INFORMATION);
+LUACWRAP_DEFINESTRUCT(winapi, HDITEMW);
 
 static luacwrap_RecordMember s_memberLVCOLUMNW[] =
 {
@@ -172,6 +193,16 @@ static luacwrap_RecordMember s_memberSHINITDLGINFO[] =
 LUACWRAP_DEFINESTRUCT(winapi, SHINITDLGINFO);
 #endif
 
+static luacwrap_RecordMember s_memberNMLVKEYDOWN[] =
+{
+  { "hdr", offsetof(NMLVKEYDOWN, hdr), "NMHDR"},
+  { "wVKey", offsetof(NMLVKEYDOWN, wVKey), "$u16"},
+  { "flags", offsetof(NMLVKEYDOWN, flags), "$u32"},
+  { NULL, 0 }
+};
+
+LUACWRAP_DEFINESTRUCT(winapi, NMLVKEYDOWN);
+
 static luacwrap_RecordMember s_memberLOGPEN[] =
 {
   { "lopnStyle", offsetof(LOGPEN, lopnStyle), "$u32"},
@@ -191,6 +222,20 @@ static luacwrap_RecordMember s_memberSECURITY_ATTRIBUTES[] =
 };
 
 LUACWRAP_DEFINESTRUCT(winapi, SECURITY_ATTRIBUTES);
+
+#if (defined(USE_COMMANDBAR))
+static luacwrap_RecordMember s_memberCOMMANDBANDSRESTOREINFO[] =
+{
+  { "cbSize", offsetof(COMMANDBANDSRESTOREINFO, cbSize), "$u32"},
+  { "wID", offsetof(COMMANDBANDSRESTOREINFO, wID), "$u32"},
+  { "fStyle", offsetof(COMMANDBANDSRESTOREINFO, fStyle), "$u32"},
+  { "cxRestored", offsetof(COMMANDBANDSRESTOREINFO, cxRestored), "$u32"},
+  { "fMaximized", offsetof(COMMANDBANDSRESTOREINFO, fMaximized), "$i32"},
+  { NULL, 0 }
+};
+
+LUACWRAP_DEFINESTRUCT(winapi, COMMANDBANDSRESTOREINFO);
+#endif
 
 static luacwrap_RecordMember s_memberLOGFONTW[] =
 {
@@ -271,6 +316,42 @@ static luacwrap_RecordMember s_memberPOINTS[] =
 
 LUACWRAP_DEFINESTRUCT(winapi, POINTS);
 
+#if (defined(USE_AYGSHELL))
+static luacwrap_RecordMember s_memberSHACTIVATEINFO[] =
+{
+  { "cbSize", offsetof(SHACTIVATEINFO, cbSize), "$u32"},
+  { "hwndLastFocus", offsetof(SHACTIVATEINFO, hwndLastFocus), "$ptr"},
+  { NULL, 0 }
+};
+
+LUACWRAP_DEFINESTRUCT(winapi, SHACTIVATEINFO);
+#endif
+
+static luacwrap_RecordMember s_memberPROCESS_INFORMATION[] =
+{
+  { "hProcess", offsetof(PROCESS_INFORMATION, hProcess), "$ptr"},
+  { "hThread", offsetof(PROCESS_INFORMATION, hThread), "$ptr"},
+  { "dwProcessId", offsetof(PROCESS_INFORMATION, dwProcessId), "$u32"},
+  { "dwThreadId", offsetof(PROCESS_INFORMATION, dwThreadId), "$u32"},
+  { NULL, 0 }
+};
+
+LUACWRAP_DEFINESTRUCT(winapi, PROCESS_INFORMATION);
+
+#if (defined(UNDER_CE))
+static luacwrap_RecordMember s_memberMSGQUEUEOPTIONS[] =
+{
+  { "dwSize", offsetof(MSGQUEUEOPTIONS, dwSize), "$u32"},
+  { "dwFlags", offsetof(MSGQUEUEOPTIONS, dwFlags), "$u32"},
+  { "dwMaxMessages", offsetof(MSGQUEUEOPTIONS, dwMaxMessages), "$u32"},
+  { "cbMaxMessage", offsetof(MSGQUEUEOPTIONS, cbMaxMessage), "$u32"},
+  { "bReadAccess", offsetof(MSGQUEUEOPTIONS, bReadAccess), "$i32"},
+  { NULL, 0 }
+};
+
+LUACWRAP_DEFINESTRUCT(winapi, MSGQUEUEOPTIONS);
+#endif
+
 static luacwrap_RecordMember s_memberRECT[] =
 {
   { "left", offsetof(RECT, left), "$i32"},
@@ -281,6 +362,53 @@ static luacwrap_RecordMember s_memberRECT[] =
 };
 
 LUACWRAP_DEFINESTRUCT(winapi, RECT);
+
+#if (!defined(UNDER_CE))
+static luacwrap_RecordMember s_memberPRINTDLGW[] =
+{
+  { "lStructSize", offsetof(PRINTDLGW, lStructSize), "$u32"},
+  { "hwndOwner", offsetof(PRINTDLGW, hwndOwner), "$ptr"},
+  { "hDevMode", offsetof(PRINTDLGW, hDevMode), "HGLOBAL"},
+  { "hDevNames", offsetof(PRINTDLGW, hDevNames), "HGLOBAL"},
+  { "hDC", offsetof(PRINTDLGW, hDC), "$ptr"},
+  { "Flags", offsetof(PRINTDLGW, Flags), "$u32"},
+  { "nFromPage", offsetof(PRINTDLGW, nFromPage), "$u16"},
+  { "nToPage", offsetof(PRINTDLGW, nToPage), "$u16"},
+  { "nMinPage", offsetof(PRINTDLGW, nMinPage), "$u16"},
+  { "nMaxPage", offsetof(PRINTDLGW, nMaxPage), "$u16"},
+  { "nCopies", offsetof(PRINTDLGW, nCopies), "$u16"},
+  { "hInstance", offsetof(PRINTDLGW, hInstance), "$ptr"},
+  { "lCustData", offsetof(PRINTDLGW, lCustData), "$u32"},
+  { "lpPrintTemplateName", offsetof(PRINTDLGW, lpPrintTemplateName), "$ptr"},
+  { "lpSetupTemplateName", offsetof(PRINTDLGW, lpSetupTemplateName), "$ptr"},
+  { "hPrintTemplate", offsetof(PRINTDLGW, hPrintTemplate), "HGLOBAL"},
+  { "hSetupTemplate", offsetof(PRINTDLGW, hSetupTemplate), "HGLOBAL"},
+  { NULL, 0 }
+};
+
+LUACWRAP_DEFINESTRUCT(winapi, PRINTDLGW);
+#endif
+
+#if (!defined(UNDER_CE))
+static luacwrap_RecordMember s_memberWNDCLASSEXW[] =
+{
+  { "cbSize", offsetof(WNDCLASSEXW, cbSize), "$u32"},
+  { "style", offsetof(WNDCLASSEXW, style), "$u32"},
+  { "lpfnWndProc", offsetof(WNDCLASSEXW, lpfnWndProc), "$ptr"},
+  { "cbClsExtra", offsetof(WNDCLASSEXW, cbClsExtra), "$i32"},
+  { "cbWndExtra", offsetof(WNDCLASSEXW, cbWndExtra), "$i32"},
+  { "hInstance", offsetof(WNDCLASSEXW, hInstance), "$ptr"},
+  { "hIcon", offsetof(WNDCLASSEXW, hIcon), "$ptr"},
+  { "hCursor", offsetof(WNDCLASSEXW, hCursor), "$ptr"},
+  { "hbrBackground", offsetof(WNDCLASSEXW, hbrBackground), "$ptr"},
+  { "lpszMenuName", offsetof(WNDCLASSEXW, lpszMenuName), "$ptr"},
+  { "lpszClassName", offsetof(WNDCLASSEXW, lpszClassName), "$ptr"},
+  { "hIconSm", offsetof(WNDCLASSEXW, hIconSm), "$ptr"},
+  { NULL, 0 }
+};
+
+LUACWRAP_DEFINESTRUCT(winapi, WNDCLASSEXW);
+#endif
 
 #if (defined(USE_AYGSHELL))
 static luacwrap_RecordMember s_memberSHMENUBARINFO[] =
@@ -313,6 +441,25 @@ static luacwrap_RecordMember s_memberOSVERSIONINFOW[] =
 
 LUACWRAP_DEFINESTRUCT(winapi, OSVERSIONINFOW);
 
+static luacwrap_RecordMember s_memberSIZE[] =
+{
+  { "cx", offsetof(SIZE, cx), "$i32"},
+  { "cy", offsetof(SIZE, cy), "$i32"},
+  { NULL, 0 }
+};
+
+LUACWRAP_DEFINESTRUCT(winapi, SIZE);
+
+static luacwrap_RecordMember s_memberTTHITTESTINFOW[] =
+{
+  { "hwnd", offsetof(TTHITTESTINFOW, hwnd), "$ptr"},
+  { "pt", offsetof(TTHITTESTINFOW, pt), "POINT"},
+  { "ti", offsetof(TTHITTESTINFOW, ti), "TTTOOLINFOW"},
+  { NULL, 0 }
+};
+
+LUACWRAP_DEFINESTRUCT(winapi, TTHITTESTINFOW);
+
 static luacwrap_RecordMember s_memberOPENFILENAMEW[] =
 {
   { "lStructSize", offsetof(OPENFILENAMEW, lStructSize), "$u32"},
@@ -339,18 +486,14 @@ static luacwrap_RecordMember s_memberOPENFILENAMEW[] =
 
 LUACWRAP_DEFINESTRUCT(winapi, OPENFILENAMEW);
 
-static luacwrap_RecordMember s_memberTCITEMHEADERW[] =
+static luacwrap_RecordMember s_memberTCHITTESTINFO[] =
 {
-  { "mask", offsetof(TCITEMHEADERW, mask), "$u32"},
-  { "lpReserved1", offsetof(TCITEMHEADERW, lpReserved1), "$u32"},
-  { "lpReserved2", offsetof(TCITEMHEADERW, lpReserved2), "$u32"},
-  { "pszText", offsetof(TCITEMHEADERW, pszText), "$ptr"},
-  { "cchTextMax", offsetof(TCITEMHEADERW, cchTextMax), "$i32"},
-  { "iImage", offsetof(TCITEMHEADERW, iImage), "$i32"},
+  { "pt", offsetof(TCHITTESTINFO, pt), "POINT"},
+  { "flags", offsetof(TCHITTESTINFO, flags), "$u32"},
   { NULL, 0 }
 };
 
-LUACWRAP_DEFINESTRUCT(winapi, TCITEMHEADERW);
+LUACWRAP_DEFINESTRUCT(winapi, TCHITTESTINFO);
 
 static luacwrap_RecordMember s_memberMENUITEMINFOW[] =
 {
@@ -384,44 +527,38 @@ static luacwrap_RecordMember s_memberCHOOSECOLOR[] =
 
 LUACWRAP_DEFINESTRUCT(winapi, CHOOSECOLOR);
 
-#if (defined(USE_COMMANDBAR))
-static luacwrap_RecordMember s_memberCOMMANDBANDSRESTOREINFO[] =
+static luacwrap_RecordMember s_memberTCITEMHEADERW[] =
 {
-  { "cbSize", offsetof(COMMANDBANDSRESTOREINFO, cbSize), "$u32"},
-  { "wID", offsetof(COMMANDBANDSRESTOREINFO, wID), "$u32"},
-  { "fStyle", offsetof(COMMANDBANDSRESTOREINFO, fStyle), "$u32"},
-  { "cxRestored", offsetof(COMMANDBANDSRESTOREINFO, cxRestored), "$u32"},
-  { "fMaximized", offsetof(COMMANDBANDSRESTOREINFO, fMaximized), "$i32"},
+  { "mask", offsetof(TCITEMHEADERW, mask), "$u32"},
+  { "lpReserved1", offsetof(TCITEMHEADERW, lpReserved1), "$u32"},
+  { "lpReserved2", offsetof(TCITEMHEADERW, lpReserved2), "$u32"},
+  { "pszText", offsetof(TCITEMHEADERW, pszText), "$ptr"},
+  { "cchTextMax", offsetof(TCITEMHEADERW, cchTextMax), "$i32"},
+  { "iImage", offsetof(TCITEMHEADERW, iImage), "$i32"},
   { NULL, 0 }
 };
 
-LUACWRAP_DEFINESTRUCT(winapi, COMMANDBANDSRESTOREINFO);
-#endif
+LUACWRAP_DEFINESTRUCT(winapi, TCITEMHEADERW);
 
-#if (defined(USE_AYGSHELL))
-static luacwrap_RecordMember s_memberSHACTIVATEINFO[] =
+static luacwrap_RecordMember s_memberTVINSERTSTRUCTW[] =
 {
-  { "cbSize", offsetof(SHACTIVATEINFO, cbSize), "$u32"},
-  { "hwndLastFocus", offsetof(SHACTIVATEINFO, hwndLastFocus), "$ptr"},
+  { "hParent", offsetof(TVINSERTSTRUCTW, hParent), "$ptr"},
+  { "hInsertAfter", offsetof(TVINSERTSTRUCTW, hInsertAfter), "$ptr"},
+  { "item", offsetof(TVINSERTSTRUCTW, item), "TVITEMW"},
   { NULL, 0 }
 };
 
-LUACWRAP_DEFINESTRUCT(winapi, SHACTIVATEINFO);
-#endif
+LUACWRAP_DEFINESTRUCT(winapi, TVINSERTSTRUCTW);
 
-#if (defined(UNDER_CE))
-static luacwrap_RecordMember s_memberMSGQUEUEOPTIONS[] =
+static luacwrap_RecordMember s_memberTVHITTESTINFO[] =
 {
-  { "dwSize", offsetof(MSGQUEUEOPTIONS, dwSize), "$u32"},
-  { "dwFlags", offsetof(MSGQUEUEOPTIONS, dwFlags), "$u32"},
-  { "dwMaxMessages", offsetof(MSGQUEUEOPTIONS, dwMaxMessages), "$u32"},
-  { "cbMaxMessage", offsetof(MSGQUEUEOPTIONS, cbMaxMessage), "$u32"},
-  { "bReadAccess", offsetof(MSGQUEUEOPTIONS, bReadAccess), "$i32"},
+  { "pt", offsetof(TVHITTESTINFO, pt), "POINT"},
+  { "flags", offsetof(TVHITTESTINFO, flags), "$u32"},
+  { "hItem", offsetof(TVHITTESTINFO, hItem), "$ptr"},
   { NULL, 0 }
 };
 
-LUACWRAP_DEFINESTRUCT(winapi, MSGQUEUEOPTIONS);
-#endif
+LUACWRAP_DEFINESTRUCT(winapi, TVHITTESTINFO);
 
 static luacwrap_RecordMember s_memberNMHDR[] =
 {
@@ -433,40 +570,34 @@ static luacwrap_RecordMember s_memberNMHDR[] =
 
 LUACWRAP_DEFINESTRUCT(winapi, NMHDR);
 
-#if (!defined(UNDER_CE))
-static luacwrap_RecordMember s_memberPRINTDLGW[] =
+static luacwrap_RecordMember s_memberCREATESTRUCTW[] =
 {
-  { "lStructSize", offsetof(PRINTDLGW, lStructSize), "$u32"},
-  { "hwndOwner", offsetof(PRINTDLGW, hwndOwner), "$ptr"},
-  { "hDevMode", offsetof(PRINTDLGW, hDevMode), "HGLOBAL"},
-  { "hDevNames", offsetof(PRINTDLGW, hDevNames), "HGLOBAL"},
-  { "hDC", offsetof(PRINTDLGW, hDC), "$ptr"},
-  { "Flags", offsetof(PRINTDLGW, Flags), "$u32"},
-  { "nFromPage", offsetof(PRINTDLGW, nFromPage), "$u16"},
-  { "nToPage", offsetof(PRINTDLGW, nToPage), "$u16"},
-  { "nMinPage", offsetof(PRINTDLGW, nMinPage), "$u16"},
-  { "nMaxPage", offsetof(PRINTDLGW, nMaxPage), "$u16"},
-  { "nCopies", offsetof(PRINTDLGW, nCopies), "$u16"},
-  { "hInstance", offsetof(PRINTDLGW, hInstance), "$ptr"},
-  { "lCustData", offsetof(PRINTDLGW, lCustData), "$u32"},
-  { "lpPrintTemplateName", offsetof(PRINTDLGW, lpPrintTemplateName), "$ptr"},
-  { "lpSetupTemplateName", offsetof(PRINTDLGW, lpSetupTemplateName), "$ptr"},
-  { "hPrintTemplate", offsetof(PRINTDLGW, hPrintTemplate), "HGLOBAL"},
-  { "hSetupTemplate", offsetof(PRINTDLGW, hSetupTemplate), "HGLOBAL"},
+  { "lpCreateParams", offsetof(CREATESTRUCTW, lpCreateParams), "$ref"},
+  { "hInstance", offsetof(CREATESTRUCTW, hInstance), "$ptr"},
+  { "hMenu", offsetof(CREATESTRUCTW, hMenu), "$ptr"},
+  { "hwndParent", offsetof(CREATESTRUCTW, hwndParent), "$ptr"},
+  { "cy", offsetof(CREATESTRUCTW, cy), "$i32"},
+  { "cx", offsetof(CREATESTRUCTW, cx), "$i32"},
+  { "y", offsetof(CREATESTRUCTW, y), "$i32"},
+  { "x", offsetof(CREATESTRUCTW, x), "$i32"},
+  { "style", offsetof(CREATESTRUCTW, style), "$i32"},
+  { "lpszName", offsetof(CREATESTRUCTW, lpszName), "$ptr"},
+  { "lpszClass", offsetof(CREATESTRUCTW, lpszClass), "$ptr"},
+  { "dwExStyle", offsetof(CREATESTRUCTW, dwExStyle), "$u32"},
   { NULL, 0 }
 };
 
-LUACWRAP_DEFINESTRUCT(winapi, PRINTDLGW);
-#endif
+LUACWRAP_DEFINESTRUCT(winapi, CREATESTRUCTW);
 
-static luacwrap_RecordMember s_memberTCHITTESTINFO[] =
+static luacwrap_RecordMember s_memberHDHITTESTINFO[] =
 {
-  { "pt", offsetof(TCHITTESTINFO, pt), "POINT"},
-  { "flags", offsetof(TCHITTESTINFO, flags), "$u32"},
+  { "pt", offsetof(HDHITTESTINFO, pt), "POINT"},
+  { "flags", offsetof(HDHITTESTINFO, flags), "$u32"},
+  { "iItem", offsetof(HDHITTESTINFO, iItem), "$i32"},
   { NULL, 0 }
 };
 
-LUACWRAP_DEFINESTRUCT(winapi, TCHITTESTINFO);
+LUACWRAP_DEFINESTRUCT(winapi, HDHITTESTINFO);
 
 #if (!defined(UNDER_CE))
 static luacwrap_RecordMember s_memberNMITEMACTIVATE[] =
@@ -514,24 +645,36 @@ static luacwrap_RecordMember s_memberTBBUTTONINFOW[] =
 LUACWRAP_DEFINESTRUCT(winapi, TBBUTTONINFOW);
 
 #if (!defined(UNDER_CE))
-static luacwrap_RecordMember s_memberWNDCLASSEXW[] =
+static luacwrap_RecordMember s_memberLVGROUP[] =
 {
-  { "cbSize", offsetof(WNDCLASSEXW, cbSize), "$u32"},
-  { "style", offsetof(WNDCLASSEXW, style), "$u32"},
-  { "lpfnWndProc", offsetof(WNDCLASSEXW, lpfnWndProc), "$ptr"},
-  { "cbClsExtra", offsetof(WNDCLASSEXW, cbClsExtra), "$i32"},
-  { "cbWndExtra", offsetof(WNDCLASSEXW, cbWndExtra), "$i32"},
-  { "hInstance", offsetof(WNDCLASSEXW, hInstance), "$ptr"},
-  { "hIcon", offsetof(WNDCLASSEXW, hIcon), "$ptr"},
-  { "hCursor", offsetof(WNDCLASSEXW, hCursor), "$ptr"},
-  { "hbrBackground", offsetof(WNDCLASSEXW, hbrBackground), "$ptr"},
-  { "lpszMenuName", offsetof(WNDCLASSEXW, lpszMenuName), "$ptr"},
-  { "lpszClassName", offsetof(WNDCLASSEXW, lpszClassName), "$ptr"},
-  { "hIconSm", offsetof(WNDCLASSEXW, hIconSm), "$ptr"},
+  { "cbSize", offsetof(LVGROUP, cbSize), "$u32"},
+  { "mask", offsetof(LVGROUP, mask), "$u32"},
+  { "pszHeader", offsetof(LVGROUP, pszHeader), "$ptr"},
+  { "cchHeader", offsetof(LVGROUP, cchHeader), "$i32"},
+  { "pszFooter", offsetof(LVGROUP, pszFooter), "$ptr"},
+  { "cchFooter", offsetof(LVGROUP, cchFooter), "$i32"},
+  { "iGroupId", offsetof(LVGROUP, iGroupId), "$i32"},
+  { "stateMask", offsetof(LVGROUP, stateMask), "$u32"},
+  { "state", offsetof(LVGROUP, state), "$u32"},
+  { "uAlign", offsetof(LVGROUP, uAlign), "$u32"},
+  { "pszSubtitle", offsetof(LVGROUP, pszSubtitle), "$ptr"},
+  { "cchSubtitle", offsetof(LVGROUP, cchSubtitle), "$u32"},
+  { "pszTask", offsetof(LVGROUP, pszTask), "$ptr"},
+  { "cchTask", offsetof(LVGROUP, cchTask), "$u32"},
+  { "pszDescriptionTop", offsetof(LVGROUP, pszDescriptionTop), "$ptr"},
+  { "cchDescriptionTop", offsetof(LVGROUP, cchDescriptionTop), "$u32"},
+  { "pszDescriptionBottom", offsetof(LVGROUP, pszDescriptionBottom), "$ptr"},
+  { "cchDescriptionBottom", offsetof(LVGROUP, cchDescriptionBottom), "$u32"},
+  { "iTitleImage", offsetof(LVGROUP, iTitleImage), "$i32"},
+  { "iExtendedImage", offsetof(LVGROUP, iExtendedImage), "$i32"},
+  { "iFirstItem", offsetof(LVGROUP, iFirstItem), "$i32"},
+  { "cItems", offsetof(LVGROUP, cItems), "$u32"},
+  { "pszSubsetTitle", offsetof(LVGROUP, pszSubsetTitle), "$ptr"},
+  { "cchSubsetTitle", offsetof(LVGROUP, cchSubsetTitle), "$u32"},
   { NULL, 0 }
 };
 
-LUACWRAP_DEFINESTRUCT(winapi, WNDCLASSEXW);
+LUACWRAP_DEFINESTRUCT(winapi, LVGROUP);
 #endif
 
 static luacwrap_RecordMember s_memberACCEL[] =
@@ -575,34 +718,29 @@ static luacwrap_RecordMember s_memberPOINT[] =
 
 LUACWRAP_DEFINESTRUCT(winapi, POINT);
 
-static luacwrap_RecordMember s_memberCREATESTRUCTW[] =
+static luacwrap_RecordMember s_memberNMLISTVIEW[] =
 {
-  { "lpCreateParams", offsetof(CREATESTRUCTW, lpCreateParams), "$ref"},
-  { "hInstance", offsetof(CREATESTRUCTW, hInstance), "$ptr"},
-  { "hMenu", offsetof(CREATESTRUCTW, hMenu), "$ptr"},
-  { "hwndParent", offsetof(CREATESTRUCTW, hwndParent), "$ptr"},
-  { "cy", offsetof(CREATESTRUCTW, cy), "$i32"},
-  { "cx", offsetof(CREATESTRUCTW, cx), "$i32"},
-  { "y", offsetof(CREATESTRUCTW, y), "$i32"},
-  { "x", offsetof(CREATESTRUCTW, x), "$i32"},
-  { "style", offsetof(CREATESTRUCTW, style), "$i32"},
-  { "lpszName", offsetof(CREATESTRUCTW, lpszName), "$ptr"},
-  { "lpszClass", offsetof(CREATESTRUCTW, lpszClass), "$ptr"},
-  { "dwExStyle", offsetof(CREATESTRUCTW, dwExStyle), "$u32"},
+  { "hdr", offsetof(NMLISTVIEW, hdr), "NMHDR"},
+  { "iItem", offsetof(NMLISTVIEW, iItem), "$i32"},
+  { "iSubItem", offsetof(NMLISTVIEW, iSubItem), "$i32"},
+  { "uNewState", offsetof(NMLISTVIEW, uNewState), "$u32"},
+  { "uOldState", offsetof(NMLISTVIEW, uOldState), "$u32"},
+  { "uChanged", offsetof(NMLISTVIEW, uChanged), "$u32"},
+  { "ptAction", offsetof(NMLISTVIEW, ptAction), "POINT"},
+  { "lParam", offsetof(NMLISTVIEW, lParam), "$ref"},
   { NULL, 0 }
 };
 
-LUACWRAP_DEFINESTRUCT(winapi, CREATESTRUCTW);
+LUACWRAP_DEFINESTRUCT(winapi, NMLISTVIEW);
 
-static luacwrap_RecordMember s_memberTVINSERTSTRUCTW[] =
+static luacwrap_RecordMember s_memberNMLVDISPINFOW[] =
 {
-  { "hParent", offsetof(TVINSERTSTRUCTW, hParent), "$ptr"},
-  { "hInsertAfter", offsetof(TVINSERTSTRUCTW, hInsertAfter), "$ptr"},
-  { "item", offsetof(TVINSERTSTRUCTW, item), "TVITEMW"},
+  { "hdr", offsetof(NMLVDISPINFOW, hdr), "NMHDR"},
+  { "item", offsetof(NMLVDISPINFOW, item), "LVITEMW"},
   { NULL, 0 }
 };
 
-LUACWRAP_DEFINESTRUCT(winapi, TVINSERTSTRUCTW);
+LUACWRAP_DEFINESTRUCT(winapi, NMLVDISPINFOW);
 
 static luacwrap_RecordMember s_memberDLGTEMPLATE[] =
 {
@@ -640,72 +778,62 @@ static luacwrap_RecordMember s_memberTPMPARAMS[] =
 
 LUACWRAP_DEFINESTRUCT(winapi, TPMPARAMS);
 
-static luacwrap_RecordMember s_memberSIZE[] =
+static luacwrap_RecordMember s_memberLVITEMW[] =
 {
-  { "cx", offsetof(SIZE, cx), "$i32"},
-  { "cy", offsetof(SIZE, cy), "$i32"},
-  { NULL, 0 }
-};
-
-LUACWRAP_DEFINESTRUCT(winapi, SIZE);
-
+  { "mask", offsetof(LVITEMW, mask), "$u32"},
+  { "iItem", offsetof(LVITEMW, iItem), "$i32"},
+  { "iSubItem", offsetof(LVITEMW, iSubItem), "$i32"},
+  { "state", offsetof(LVITEMW, state), "$u32"},
+  { "stateMask", offsetof(LVITEMW, stateMask), "$u32"},
+  { "pszText", offsetof(LVITEMW, pszText), "$ptr"},
+  { "cchTextMax", offsetof(LVITEMW, cchTextMax), "$i32"},
+  { "iImage", offsetof(LVITEMW, iImage), "$i32"},
+  { "lParam", offsetof(LVITEMW, lParam), "$ref"},
+  { "iIndent", offsetof(LVITEMW, iIndent), "$i32"},
 #if (!defined(UNDER_CE))
-static luacwrap_RecordMember s_memberLVGROUP[] =
-{
-  { "cbSize", offsetof(LVGROUP, cbSize), "$u32"},
-  { "mask", offsetof(LVGROUP, mask), "$u32"},
-  { "pszHeader", offsetof(LVGROUP, pszHeader), "$ptr"},
-  { "cchHeader", offsetof(LVGROUP, cchHeader), "$i32"},
-  { "pszFooter", offsetof(LVGROUP, pszFooter), "$ptr"},
-  { "cchFooter", offsetof(LVGROUP, cchFooter), "$i32"},
-  { "iGroupId", offsetof(LVGROUP, iGroupId), "$i32"},
-  { "stateMask", offsetof(LVGROUP, stateMask), "$u32"},
-  { "state", offsetof(LVGROUP, state), "$u32"},
-  { "uAlign", offsetof(LVGROUP, uAlign), "$u32"},
-  { "pszSubtitle", offsetof(LVGROUP, pszSubtitle), "$ptr"},
-  { "cchSubtitle", offsetof(LVGROUP, cchSubtitle), "$u32"},
-  { "pszTask", offsetof(LVGROUP, pszTask), "$ptr"},
-  { "cchTask", offsetof(LVGROUP, cchTask), "$u32"},
-  { "pszDescriptionTop", offsetof(LVGROUP, pszDescriptionTop), "$ptr"},
-  { "cchDescriptionTop", offsetof(LVGROUP, cchDescriptionTop), "$u32"},
-  { "pszDescriptionBottom", offsetof(LVGROUP, pszDescriptionBottom), "$ptr"},
-  { "cchDescriptionBottom", offsetof(LVGROUP, cchDescriptionBottom), "$u32"},
-  { "iTitleImage", offsetof(LVGROUP, iTitleImage), "$i32"},
-  { "iExtendedImage", offsetof(LVGROUP, iExtendedImage), "$i32"},
-  { "iFirstItem", offsetof(LVGROUP, iFirstItem), "$i32"},
-  { "cItems", offsetof(LVGROUP, cItems), "$u32"},
-  { "pszSubsetTitle", offsetof(LVGROUP, pszSubsetTitle), "$ptr"},
-  { "cchSubsetTitle", offsetof(LVGROUP, cchSubsetTitle), "$u32"},
-  { NULL, 0 }
-};
-
-LUACWRAP_DEFINESTRUCT(winapi, LVGROUP);
+  { "iGroupId", offsetof(LVITEMW, iGroupId), "$i32"},
 #endif
-
-static luacwrap_RecordMember s_memberNMLVKEYDOWN[] =
-{
-  { "hdr", offsetof(NMLVKEYDOWN, hdr), "NMHDR"},
-  { "wVKey", offsetof(NMLVKEYDOWN, wVKey), "$u16"},
-  { "flags", offsetof(NMLVKEYDOWN, flags), "$u32"},
   { NULL, 0 }
 };
 
-LUACWRAP_DEFINESTRUCT(winapi, NMLVKEYDOWN);
+LUACWRAP_DEFINESTRUCT(winapi, LVITEMW);
 
-static luacwrap_RecordMember s_memberNMLISTVIEW[] =
+static luacwrap_RecordMember s_memberNMTTDISPINFOW[] =
 {
-  { "hdr", offsetof(NMLISTVIEW, hdr), "NMHDR"},
-  { "iItem", offsetof(NMLISTVIEW, iItem), "$i32"},
-  { "iSubItem", offsetof(NMLISTVIEW, iSubItem), "$i32"},
-  { "uNewState", offsetof(NMLISTVIEW, uNewState), "$u32"},
-  { "uOldState", offsetof(NMLISTVIEW, uOldState), "$u32"},
-  { "uChanged", offsetof(NMLISTVIEW, uChanged), "$u32"},
-  { "ptAction", offsetof(NMLISTVIEW, ptAction), "POINT"},
-  { "lParam", offsetof(NMLISTVIEW, lParam), "$ref"},
+  { "hdr", offsetof(NMTTDISPINFOW, hdr), "NMHDR"},
+  { "lpszText", offsetof(NMTTDISPINFOW, lpszText), "$ptr"},
+  { "szText", offsetof(NMTTDISPINFOW, szText), "UINT16_80"},
+  { "hinst", offsetof(NMTTDISPINFOW, hinst), "$ptr"},
+  { "uFlags", offsetof(NMTTDISPINFOW, uFlags), "$u32"},
+  { "lParam", offsetof(NMTTDISPINFOW, lParam), "$u32"},
   { NULL, 0 }
 };
 
-LUACWRAP_DEFINESTRUCT(winapi, NMLISTVIEW);
+LUACWRAP_DEFINESTRUCT(winapi, NMTTDISPINFOW);
+
+static luacwrap_RecordMember s_memberNMHDDISPINFOW[] =
+{
+  { "hdr", offsetof(NMHDDISPINFOW, hdr), "NMHDR"},
+  { "iItem", offsetof(NMHDDISPINFOW, iItem), "$i32"},
+  { "mask", offsetof(NMHDDISPINFOW, mask), "$u32"},
+  { "pszText", offsetof(NMHDDISPINFOW, pszText), "$ptr"},
+  { "cchTextMax", offsetof(NMHDDISPINFOW, cchTextMax), "$i32"},
+  { "iImage", offsetof(NMHDDISPINFOW, iImage), "$i32"},
+  { "lParam", offsetof(NMHDDISPINFOW, lParam), "$u32"},
+  { NULL, 0 }
+};
+
+LUACWRAP_DEFINESTRUCT(winapi, NMHDDISPINFOW);
+
+static luacwrap_RecordMember s_memberNMHEADERW[] =
+{
+  { "hdr", offsetof(NMHEADERW, hdr), "NMHDR"},
+  { "iItem", offsetof(NMHEADERW, iItem), "$i32"},
+  { "iButton", offsetof(NMHEADERW, iButton), "$i32"},
+  { NULL, 0 }
+};
+
+LUACWRAP_DEFINESTRUCT(winapi, NMHEADERW);
 
 static luacwrap_RecordMember s_memberDLGITEMTEMPLATE[] =
 {
@@ -748,14 +876,20 @@ static luacwrap_RecordMember s_memberWINDOWPLACEMENT[] =
 LUACWRAP_DEFINESTRUCT(winapi, WINDOWPLACEMENT);
 #endif
 
-static luacwrap_RecordMember s_memberNMLVDISPINFOW[] =
+static luacwrap_RecordMember s_memberTTTOOLINFOW[] =
 {
-  { "hdr", offsetof(NMLVDISPINFOW, hdr), "NMHDR"},
-  { "item", offsetof(NMLVDISPINFOW, item), "LVITEMW"},
+  { "cbSize", offsetof(TTTOOLINFOW, cbSize), "$u32"},
+  { "uFlags", offsetof(TTTOOLINFOW, uFlags), "$u32"},
+  { "hwnd", offsetof(TTTOOLINFOW, hwnd), "$ptr"},
+  { "uId", offsetof(TTTOOLINFOW, uId), "$ptr"},
+  { "rect", offsetof(TTTOOLINFOW, rect), "RECT"},
+  { "hinst", offsetof(TTTOOLINFOW, hinst), "$ptr"},
+  { "lpszText", offsetof(TTTOOLINFOW, lpszText), "$ptr"},
+  { "lParam", offsetof(TTTOOLINFOW, lParam), "$u32"},
   { NULL, 0 }
 };
 
-LUACWRAP_DEFINESTRUCT(winapi, NMLVDISPINFOW);
+LUACWRAP_DEFINESTRUCT(winapi, TTTOOLINFOW);
 
 static luacwrap_RecordMember s_memberMSG[] =
 {
@@ -784,25 +918,14 @@ static luacwrap_RecordMember s_memberTCITEMW[] =
 
 LUACWRAP_DEFINESTRUCT(winapi, TCITEMW);
 
-static luacwrap_RecordMember s_memberLVITEMW[] =
+static luacwrap_RecordMember s_memberINITCOMMONCONTROLSEX[] =
 {
-  { "mask", offsetof(LVITEMW, mask), "$u32"},
-  { "iItem", offsetof(LVITEMW, iItem), "$i32"},
-  { "iSubItem", offsetof(LVITEMW, iSubItem), "$i32"},
-  { "state", offsetof(LVITEMW, state), "$u32"},
-  { "stateMask", offsetof(LVITEMW, stateMask), "$u32"},
-  { "pszText", offsetof(LVITEMW, pszText), "$ptr"},
-  { "cchTextMax", offsetof(LVITEMW, cchTextMax), "$i32"},
-  { "iImage", offsetof(LVITEMW, iImage), "$i32"},
-  { "lParam", offsetof(LVITEMW, lParam), "$ref"},
-  { "iIndent", offsetof(LVITEMW, iIndent), "$i32"},
-#if (!defined(UNDER_CE))
-  { "iGroupId", offsetof(LVITEMW, iGroupId), "$i32"},
-#endif
+  { "dwSize", offsetof(INITCOMMONCONTROLSEX, dwSize), "$u32"},
+  { "dwICC", offsetof(INITCOMMONCONTROLSEX, dwICC), "$u32"},
   { NULL, 0 }
 };
 
-LUACWRAP_DEFINESTRUCT(winapi, LVITEMW);
+LUACWRAP_DEFINESTRUCT(winapi, INITCOMMONCONTROLSEX);
 
 static luacwrap_RecordMember s_memberWNDCLASSW[] =
 {
@@ -862,9 +985,51 @@ int lua_tolwparam( lua_State *L, int idx )
       v = lua_tointeger(L, idx);
     }
     break;
+    case LUA_TNONE:
+    case LUA_TNIL:
+      // accept none and nil
+    break;
+    default:
+    {
+      const char *msg = lua_pushfstring(L, "LPARAM or WPARAM expected but got %s", luaL_typename(L, idx));
+      luaL_argerror(L, idx, msg);
+    } 
+    break;
   }
   return v;
 } 
+
+LPCWSTR lua_tostring_or_atom( lua_State *L, int idx )
+{
+  LPCWSTR v = 0;
+  switch (lua_type(L, idx))
+  {
+    // case LUA_TLIGHTUSERDATA:
+    // case LUA_TUSERDATA:
+    // {
+    //   v = (LPCWSTR)lua_touserdata(L, idx);
+    // }
+    // break;
+    case LUA_TSTRING:
+    {
+      v = (LPCWSTR)lua_tostring(L, idx);
+    }
+    break;
+    case LUA_TNUMBER:
+    {
+      v = (LPCWSTR)lua_tointeger(L, idx);
+    }
+    break;
+    default:
+    {
+      const char *msg = lua_pushfstring(L, "LPCWSTR or ATOM expected but got %s", luaL_typename(L, idx));
+      luaL_argerror(L, idx, msg);
+    } 
+    break;
+  }
+  return v;
+} 
+
 
 int lua_tohandle( lua_State *L, int idx )
 {
@@ -881,6 +1046,16 @@ int lua_tohandle( lua_State *L, int idx )
     {
       v = lua_tointeger(L, idx);
     }
+    break;
+    case LUA_TNONE:
+    case LUA_TNIL:
+      // accept none and nil
+    break;
+    default:
+    {
+      const char *msg = lua_pushfstring(L, "HANDLE (number or userdata) expected but got %s", luaL_typename(L, idx));
+      luaL_argerror(L, idx, msg);
+    } 
     break;
   }
   return v;
@@ -901,18 +1076,45 @@ int lua_toresourceref( lua_State *L, int idx )
       v = lua_tointeger(L, idx);
     }
     break;
+    case LUA_TNONE:
+    case LUA_TNIL:
+      // accept none and nil
+    break;
+    default:
+    {
+      const char *msg = lua_pushfstring(L, "RESOURCEREF (number or string) expected but got %s", luaL_typename(L, idx));
+      luaL_argerror(L, idx, msg);
+    } 
+    break;
   }
   return v;
 } 
 
-#define LUA_WIN32GUI_LIBNAME "winapi"
-#define LUA_WIN32GUI_VERSION "winapi version 1.0"
+//////////////////////////////////////////////////////////////////////////
+/**
 
-int luawrap_version( lua_State *L )
+  helper functions to get pointer to DefDlgProc and DefWindowProc
+
+*/////////////////////////////////////////////////////////////////////////
+
+static int winapi_GetDefDlgProcW(lua_State* L)
 {
-  lua_pushstring( L, LUA_WIN32GUI_VERSION);
+  lua_pushlightuserdata(L,DefDlgProcW);
   return 1;
 }
+
+static int winapi_GetDefWindowProcW(lua_State* L)
+{
+  lua_pushlightuserdata(L,DefWindowProcW);
+  return 1;
+}
+
+//////////////////////////////////////////////////////////////////////////
+/**
+
+  helper functions to process messages (msg loop implementation)
+
+*/////////////////////////////////////////////////////////////////////////
 
 int winapi_ProcessMessages( lua_State *L )
 {
@@ -927,6 +1129,13 @@ int winapi_ProcessMessages( lua_State *L )
   return 1;
 }
 
+//////////////////////////////////////////////////////////////////////////
+/**
+
+  generated wrappers
+
+*/////////////////////////////////////////////////////////////////////////
+
 int winapi_GetLastError( lua_State *L )
 {
   int numret = 0;
@@ -937,7 +1146,7 @@ int winapi_GetLastError( lua_State *L )
     GetLastError(
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushnumber(L, retval); ++numret;
 
   return numret;
@@ -973,7 +1182,7 @@ int winapi_GetModuleHandleW( lua_State *L )
       p1
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushlightuserdata(L, (PVOID)retval); ++numret;
 
   return numret;
@@ -1015,14 +1224,14 @@ int winapi_GetVersionExW( lua_State *L )
   BOOL retval;
   OSVERSIONINFOW* p1;
 
-  p1 = (OSVERSIONINFOW*)luacwrap_checktype(L, 1, &regType_OSVERSIONINFOW.hdr);
+  p1 = (OSVERSIONINFOW*)g_luacwrapiface->checktype(L, 1, &regType_OSVERSIONINFOW.hdr);
 
   retval = 
     GetVersionExW(
       p1
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -1053,11 +1262,11 @@ int winapi_CreateProcessW( lua_State *L )
   }
   if (!lua_isnil(L, 3))
   {
-    p3 = (SECURITY_ATTRIBUTES*)luacwrap_checktype(L, 3, &regType_SECURITY_ATTRIBUTES.hdr);
+    p3 = (SECURITY_ATTRIBUTES*)g_luacwrapiface->checktype(L, 3, &regType_SECURITY_ATTRIBUTES.hdr);
   }
   if (!lua_isnil(L, 4))
   {
-    p4 = (SECURITY_ATTRIBUTES*)luacwrap_checktype(L, 4, &regType_SECURITY_ATTRIBUTES.hdr);
+    p4 = (SECURITY_ATTRIBUTES*)g_luacwrapiface->checktype(L, 4, &regType_SECURITY_ATTRIBUTES.hdr);
   }
   p5 = lua_tointeger(L, 5);
   p6 = (DWORD)lua_tonumber(L, 6);
@@ -1071,11 +1280,11 @@ int winapi_CreateProcessW( lua_State *L )
   }
   if (!lua_isnil(L, 9))
   {
-    p9 = (STARTUPINFOW*)luacwrap_checktype(L, 9, &regType_STARTUPINFOW.hdr);
+    p9 = (STARTUPINFOW*)g_luacwrapiface->checktype(L, 9, &regType_STARTUPINFOW.hdr);
   }
   if (!lua_isnil(L, 10))
   {
-    p10 = (PROCESS_INFORMATION*)luacwrap_checktype(L, 10, &regType_PROCESS_INFORMATION.hdr);
+    p10 = (PROCESS_INFORMATION*)g_luacwrapiface->checktype(L, 10, &regType_PROCESS_INFORMATION.hdr);
   }
 
   retval = 
@@ -1092,7 +1301,7 @@ int winapi_CreateProcessW( lua_State *L )
       p10
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -1122,7 +1331,7 @@ int winapi_CreateMutexW( lua_State *L )
 
   if (!lua_isnil(L, 1))
   {
-    p1 = (SECURITY_ATTRIBUTES*)luacwrap_checktype(L, 1, &regType_SECURITY_ATTRIBUTES.hdr);
+    p1 = (SECURITY_ATTRIBUTES*)g_luacwrapiface->checktype(L, 1, &regType_SECURITY_ATTRIBUTES.hdr);
   }
   p2 = lua_tointeger(L, 2);
   p3 = (LPCWSTR)lua_tostring(L, 3);
@@ -1134,7 +1343,7 @@ int winapi_CreateMutexW( lua_State *L )
       p3
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushlightuserdata(L, (PVOID)retval); ++numret;
 
   return numret;
@@ -1151,7 +1360,7 @@ int winapi_CreateEventW( lua_State *L )
 
   if (!lua_isnil(L, 1))
   {
-    p1 = (SECURITY_ATTRIBUTES*)luacwrap_checktype(L, 1, &regType_SECURITY_ATTRIBUTES.hdr);
+    p1 = (SECURITY_ATTRIBUTES*)g_luacwrapiface->checktype(L, 1, &regType_SECURITY_ATTRIBUTES.hdr);
   }
   p2 = lua_tointeger(L, 2);
   p3 = lua_tointeger(L, 3);
@@ -1165,7 +1374,7 @@ int winapi_CreateEventW( lua_State *L )
       p4
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushlightuserdata(L, (PVOID)retval); ++numret;
 
   return numret;
@@ -1190,7 +1399,7 @@ int winapi_OpenEventW( lua_State *L )
       p3
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushlightuserdata(L, (PVOID)retval); ++numret;
 
   return numret;
@@ -1207,7 +1416,7 @@ int winapi_CreateSemaphoreW( lua_State *L )
 
   if (!lua_isnil(L, 1))
   {
-    p1 = (SECURITY_ATTRIBUTES*)luacwrap_checktype(L, 1, &regType_SECURITY_ATTRIBUTES.hdr);
+    p1 = (SECURITY_ATTRIBUTES*)g_luacwrapiface->checktype(L, 1, &regType_SECURITY_ATTRIBUTES.hdr);
   }
   p2 = lua_tointeger(L, 2);
   p3 = lua_tointeger(L, 3);
@@ -1221,7 +1430,7 @@ int winapi_CreateSemaphoreW( lua_State *L )
       p4
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushlightuserdata(L, (PVOID)retval); ++numret;
 
   return numret;
@@ -1240,7 +1449,7 @@ int winapi_SetEvent( lua_State *L )
       p1
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -1259,7 +1468,7 @@ int winapi_ResetEvent( lua_State *L )
       p1
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -1278,7 +1487,7 @@ int winapi_PulseEvent( lua_State *L )
       p1
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -1303,8 +1512,10 @@ int winapi_ReleaseSemaphore( lua_State *L )
       &p3
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
+
+  // TODO: marshal LONG
 
   return numret;
 }
@@ -1322,7 +1533,7 @@ int winapi_ReleaseMutex( lua_State *L )
       p1
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -1344,7 +1555,7 @@ int winapi_WaitForSingleObject( lua_State *L )
       p2
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushnumber(L, retval); ++numret;
 
   return numret;
@@ -1366,8 +1577,10 @@ int winapi_GetExitCodeThread( lua_State *L )
       &p2
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
+
+  // TODO: marshal DWORD
 
   return numret;
 }
@@ -1388,8 +1601,10 @@ int winapi_GetExitCodeProcess( lua_State *L )
       &p2
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
+
+  // TODO: marshal DWORD
 
   return numret;
 }
@@ -1400,14 +1615,14 @@ int winapi_RegisterClassW( lua_State *L )
   ATOM retval;
   WNDCLASSW* p1;
 
-  p1 = (WNDCLASSW*)luacwrap_checktype(L, 1, &regType_WNDCLASSW.hdr);
+  p1 = (WNDCLASSW*)g_luacwrapiface->checktype(L, 1, &regType_WNDCLASSW.hdr);
 
   retval = 
     RegisterClassW(
       p1
     );
 
-  // marshal retval  
+  // marshal retval
   if (0 == retval)
   {
     lua_pushnil(L);
@@ -1437,7 +1652,7 @@ int winapi_UnregisterClassW( lua_State *L )
       p2
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -1453,7 +1668,7 @@ int winapi_GetClassInfoW( lua_State *L )
 
   p1 = (HINSTANCE)lua_tohandle(L, 1);
   p2 = (LPCWSTR)lua_tostring(L, 2);
-  p3 = (WNDCLASSW*)luacwrap_checktype(L, 3, &regType_WNDCLASSW.hdr);
+  p3 = (WNDCLASSW*)g_luacwrapiface->checktype(L, 3, &regType_WNDCLASSW.hdr);
 
   retval = 
     GetClassInfoW(
@@ -1462,7 +1677,7 @@ int winapi_GetClassInfoW( lua_State *L )
       p3
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -1475,14 +1690,14 @@ int winapi_RegisterClassExW( lua_State *L )
   ATOM retval;
   WNDCLASSEXW* p1;
 
-  p1 = (WNDCLASSEXW*)luacwrap_checktype(L, 1, &regType_WNDCLASSEXW.hdr);
+  p1 = (WNDCLASSEXW*)g_luacwrapiface->checktype(L, 1, &regType_WNDCLASSEXW.hdr);
 
   retval = 
     RegisterClassExW(
       p1
     );
 
-  // marshal retval  
+  // marshal retval
   if (0 == retval)
   {
     lua_pushnil(L);
@@ -1508,7 +1723,7 @@ int winapi_GetClassInfoExW( lua_State *L )
 
   p1 = (HINSTANCE)lua_tohandle(L, 1);
   p2 = (LPCWSTR)lua_tostring(L, 2);
-  p3 = (WNDCLASSEXW*)luacwrap_checktype(L, 3, &regType_WNDCLASSEXW.hdr);
+  p3 = (WNDCLASSEXW*)g_luacwrapiface->checktype(L, 3, &regType_WNDCLASSEXW.hdr);
 
   retval = 
     GetClassInfoExW(
@@ -1517,7 +1732,7 @@ int winapi_GetClassInfoExW( lua_State *L )
       p3
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -1542,7 +1757,7 @@ int winapi_CreateWindowExW( lua_State *L )
   PVOID p12;
 
   p1 = (DWORD)lua_tonumber(L, 1);
-  p2 = (LPCWSTR)lua_tostring(L, 2);
+  p2 = (LPCWSTR)lua_tostring_or_atom(L, 2);
   p3 = (LPCWSTR)lua_tostring(L, 3);
   p4 = (DWORD)lua_tonumber(L, 4);
   p5 = lua_tointeger(L, 5);
@@ -1552,7 +1767,7 @@ int winapi_CreateWindowExW( lua_State *L )
   p9 = lua_toWindow(L, 9);
   p10 = (HMENU)lua_tohandle(L, 10);
   p11 = (HINSTANCE)lua_tohandle(L, 11);
-  p12 = (PVOID)luacwrap_createreference(L, 12);
+  p12 = (PVOID)g_luacwrapiface->createreference(L, 12);
 
   retval = 
     CreateWindowExW(
@@ -1570,7 +1785,7 @@ int winapi_CreateWindowExW( lua_State *L )
       p12
     );
 
-  // marshal retval  
+  // marshal retval
   numret += lua_pushWindow(L, retval);
 
   return numret;
@@ -1586,7 +1801,7 @@ int winapi_GetDesktopWindow( lua_State *L )
     GetDesktopWindow(
     );
 
-  // marshal retval  
+  // marshal retval
   numret += lua_pushWindow(L, retval);
 
   return numret;
@@ -1605,7 +1820,7 @@ int winapi_IsWindow( lua_State *L )
       p1
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -1624,7 +1839,7 @@ int winapi_IsWindowVisible( lua_State *L )
       p1
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -1643,7 +1858,7 @@ int winapi_IsWindowEnabled( lua_State *L )
       p1
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -1665,7 +1880,7 @@ int winapi_IsChild( lua_State *L )
       p2
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -1684,7 +1899,7 @@ int winapi_DestroyWindow( lua_State *L )
       p1
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -1706,7 +1921,7 @@ int winapi_ShowWindow( lua_State *L )
       p2
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -1728,7 +1943,7 @@ int winapi_EnableWindow( lua_State *L )
       p2
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -1747,7 +1962,7 @@ int winapi_UpdateWindow( lua_State *L )
       p1
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -1763,7 +1978,7 @@ int winapi_RedrawWindow( lua_State *L )
   UINT p4;
 
   p1 = lua_toWindow(L, 1);
-  p2 = (RECT*)luacwrap_checktype(L, 2, &regType_RECT.hdr);
+  p2 = (RECT*)g_luacwrapiface->checktype(L, 2, &regType_RECT.hdr);
   p3 = lua_toRegion(L, 3);
   p4 = (UINT)lua_tonumber(L, 4);
 
@@ -1775,7 +1990,7 @@ int winapi_RedrawWindow( lua_State *L )
       p4
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -1797,7 +2012,7 @@ int winapi_SetParent( lua_State *L )
       p2
     );
 
-  // marshal retval  
+  // marshal retval
   numret += lua_pushWindow(L, retval);
 
   return numret;
@@ -1816,7 +2031,7 @@ int winapi_GetParent( lua_State *L )
       p1
     );
 
-  // marshal retval  
+  // marshal retval
   numret += lua_pushWindow(L, retval);
 
   return numret;
@@ -1838,7 +2053,7 @@ int winapi_FindWindowW( lua_State *L )
       p2
     );
 
-  // marshal retval  
+  // marshal retval
   numret += lua_pushWindow(L, retval);
 
   return numret;
@@ -1857,7 +2072,7 @@ int winapi_SetActiveWindow( lua_State *L )
       p1
     );
 
-  // marshal retval  
+  // marshal retval
   numret += lua_pushWindow(L, retval);
 
   return numret;
@@ -1873,7 +2088,7 @@ int winapi_GetActiveWindow( lua_State *L )
     GetActiveWindow(
     );
 
-  // marshal retval  
+  // marshal retval
   numret += lua_pushWindow(L, retval);
 
   return numret;
@@ -1892,7 +2107,7 @@ int winapi_GetKeyState( lua_State *L )
       p1
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -1911,7 +2126,7 @@ int winapi_GetAsyncKeyState( lua_State *L )
       p1
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -1930,7 +2145,7 @@ int winapi_DrawMenuBar( lua_State *L )
       p1
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -1946,7 +2161,7 @@ int winapi_CreateMenu( lua_State *L )
     CreateMenu(
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushlightuserdata(L, (PVOID)retval); ++numret;
 
   return numret;
@@ -1962,7 +2177,7 @@ int winapi_CreatePopupMenu( lua_State *L )
     CreatePopupMenu(
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushlightuserdata(L, (PVOID)retval); ++numret;
 
   return numret;
@@ -1981,7 +2196,7 @@ int winapi_DestroyMenu( lua_State *L )
       p1
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -2006,7 +2221,7 @@ int winapi_CheckMenuItem( lua_State *L )
       p3
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushnumber(L, retval); ++numret;
 
   return numret;
@@ -2031,7 +2246,7 @@ int winapi_EnableMenuItem( lua_State *L )
       p3
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -2053,7 +2268,7 @@ int winapi_GetSubMenu( lua_State *L )
       p2
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushlightuserdata(L, (PVOID)retval); ++numret;
 
   return numret;
@@ -2076,7 +2291,7 @@ int winapi_GetMenuItemID( lua_State *L )
       p2
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushnumber(L, retval); ++numret;
 
   return numret;
@@ -2097,7 +2312,7 @@ int winapi_GetMenuItemCount( lua_State *L )
       p1
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -2129,7 +2344,7 @@ int winapi_InsertMenuW( lua_State *L )
       p5
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -2157,7 +2372,7 @@ int winapi_AppendMenuW( lua_State *L )
       p4
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -2182,7 +2397,7 @@ int winapi_RemoveMenu( lua_State *L )
       p3
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -2207,7 +2422,7 @@ int winapi_DeleteMenu( lua_State *L )
       p3
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -2223,7 +2438,7 @@ int winapi_TrackPopupMenu( lua_State *L )
   int p4;
   int p5;
   HWND p6;
-  RECT* p7;
+  RECT* p7 = 0;
 
   p1 = (HMENU)lua_tohandle(L, 1);
   p2 = (UINT)lua_tonumber(L, 2);
@@ -2231,7 +2446,10 @@ int winapi_TrackPopupMenu( lua_State *L )
   p4 = lua_tointeger(L, 4);
   p5 = lua_tointeger(L, 5);
   p6 = lua_toWindow(L, 6);
-  p7 = (RECT*)luacwrap_checktype(L, 7, &regType_RECT.hdr);
+  if (!lua_isnil(L, 7))
+  {
+    p7 = (RECT*)g_luacwrapiface->checktype(L, 7, &regType_RECT.hdr);
+  }
 
   retval = 
     TrackPopupMenu(
@@ -2244,7 +2462,7 @@ int winapi_TrackPopupMenu( lua_State *L )
       p7
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -2259,14 +2477,17 @@ int winapi_TrackPopupMenuEx( lua_State *L )
   int p3;
   int p4;
   HWND p5;
-  TPMPARAMS* p6;
+  TPMPARAMS* p6 = 0;
 
   p1 = (HMENU)lua_tohandle(L, 1);
   p2 = (UINT)lua_tonumber(L, 2);
   p3 = lua_tointeger(L, 3);
   p4 = lua_tointeger(L, 4);
   p5 = lua_toWindow(L, 5);
-  p6 = (TPMPARAMS*)luacwrap_checktype(L, 6, &regType_TPMPARAMS.hdr);
+  if (!lua_isnil(L, 6))
+  {
+    p6 = (TPMPARAMS*)g_luacwrapiface->checktype(L, 6, &regType_TPMPARAMS.hdr);
+  }
 
   retval = 
     TrackPopupMenuEx(
@@ -2278,7 +2499,7 @@ int winapi_TrackPopupMenuEx( lua_State *L )
       p6
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -2297,7 +2518,7 @@ int winapi_InsertMenuItemW( lua_State *L )
   p1 = (HMENU)lua_tohandle(L, 1);
   p2 = (UINT)lua_tonumber(L, 2);
   p3 = lua_tointeger(L, 3);
-  p4 = (MENUITEMINFOW*)luacwrap_checktype(L, 4, &regType_MENUITEMINFOW.hdr);
+  p4 = (MENUITEMINFOW*)g_luacwrapiface->checktype(L, 4, &regType_MENUITEMINFOW.hdr);
 
   retval = 
     InsertMenuItemW(
@@ -2307,7 +2528,7 @@ int winapi_InsertMenuItemW( lua_State *L )
       p4
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -2326,7 +2547,7 @@ int winapi_GetMenuItemInfoW( lua_State *L )
   p1 = (HMENU)lua_tohandle(L, 1);
   p2 = (UINT)lua_tonumber(L, 2);
   p3 = lua_tointeger(L, 3);
-  p4 = (MENUITEMINFOW*)luacwrap_checktype(L, 4, &regType_MENUITEMINFOW.hdr);
+  p4 = (MENUITEMINFOW*)g_luacwrapiface->checktype(L, 4, &regType_MENUITEMINFOW.hdr);
 
   retval = 
     GetMenuItemInfoW(
@@ -2336,7 +2557,7 @@ int winapi_GetMenuItemInfoW( lua_State *L )
       p4
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -2354,7 +2575,7 @@ int winapi_SetMenuItemInfoW( lua_State *L )
   p1 = (HMENU)lua_tohandle(L, 1);
   p2 = (UINT)lua_tonumber(L, 2);
   p3 = lua_tointeger(L, 3);
-  p4 = (MENUITEMINFOW*)luacwrap_checktype(L, 4, &regType_MENUITEMINFOW.hdr);
+  p4 = (MENUITEMINFOW*)g_luacwrapiface->checktype(L, 4, &regType_MENUITEMINFOW.hdr);
 
   retval = 
     SetMenuItemInfoW(
@@ -2364,7 +2585,7 @@ int winapi_SetMenuItemInfoW( lua_State *L )
       p4
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -2384,7 +2605,7 @@ int winapi_IsMenu( lua_State *L )
       p1
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -2405,7 +2626,7 @@ int winapi_CloseWindow( lua_State *L )
       p1
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -2438,7 +2659,7 @@ int winapi_SetMenuItemBitmaps( lua_State *L )
       p5
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -2456,7 +2677,7 @@ int winapi_GetMenuCheckMarkDimensions( lua_State *L )
     GetMenuCheckMarkDimensions(
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -2489,7 +2710,7 @@ int winapi_ModifyMenuW( lua_State *L )
       p5
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -2524,7 +2745,7 @@ int winapi_MoveWindow( lua_State *L )
       p6
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -2561,7 +2782,7 @@ int winapi_SetWindowPos( lua_State *L )
       p7
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -2576,7 +2797,7 @@ int winapi_GetWindowPlacement( lua_State *L )
   WINDOWPLACEMENT* p2;
 
   p1 = lua_toWindow(L, 1);
-  p2 = (WINDOWPLACEMENT*)luacwrap_checktype(L, 2, &regType_WINDOWPLACEMENT.hdr);
+  p2 = (WINDOWPLACEMENT*)g_luacwrapiface->checktype(L, 2, &regType_WINDOWPLACEMENT.hdr);
 
   retval = 
     GetWindowPlacement(
@@ -2584,7 +2805,7 @@ int winapi_GetWindowPlacement( lua_State *L )
       p2
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -2600,7 +2821,7 @@ int winapi_SetWindowPlacement( lua_State *L )
   WINDOWPLACEMENT* p2;
 
   p1 = lua_toWindow(L, 1);
-  p2 = (WINDOWPLACEMENT*)luacwrap_checktype(L, 2, &regType_WINDOWPLACEMENT.hdr);
+  p2 = (WINDOWPLACEMENT*)g_luacwrapiface->checktype(L, 2, &regType_WINDOWPLACEMENT.hdr);
 
   retval = 
     SetWindowPlacement(
@@ -2608,7 +2829,7 @@ int winapi_SetWindowPlacement( lua_State *L )
       p2
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -2628,7 +2849,7 @@ int winapi_BringWindowToTop( lua_State *L )
       p1
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -2644,7 +2865,7 @@ int winapi_GetForegroundWindow( lua_State *L )
     GetForegroundWindow(
     );
 
-  // marshal retval  
+  // marshal retval
   numret += lua_pushWindow(L, retval);
 
   return numret;
@@ -2663,7 +2884,7 @@ int winapi_SetForegroundWindow( lua_State *L )
       p1
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -2682,7 +2903,7 @@ int winapi_SetFocus( lua_State *L )
       p1
     );
 
-  // marshal retval  
+  // marshal retval
   numret += lua_pushWindow(L, retval);
 
   return numret;
@@ -2698,8 +2919,94 @@ int winapi_GetFocus( lua_State *L )
     GetFocus(
     );
 
-  // marshal retval  
+  // marshal retval
   numret += lua_pushWindow(L, retval);
+
+  return numret;
+}
+
+int winapi_SwapMouseButton( lua_State *L )
+{
+  int numret = 0;
+  BOOL retval;
+  BOOL p1;
+
+  p1 = lua_tointeger(L, 1);
+
+  retval = 
+    SwapMouseButton(
+      p1
+    );
+
+  // marshal retval
+  lua_pushinteger(L, retval); ++numret;
+
+  return numret;
+}
+
+int winapi_GetMessagePos( lua_State *L )
+{
+  int numret = 0;
+  DWORD retval;
+
+
+  retval = 
+    GetMessagePos(
+    );
+
+  // marshal retval
+  lua_pushnumber(L, retval); ++numret;
+
+  return numret;
+}
+
+int winapi_GetMessageTime( lua_State *L )
+{
+  int numret = 0;
+  LONG retval;
+
+
+  retval = 
+    GetMessageTime(
+    );
+
+  // marshal retval
+  lua_pushinteger(L, retval); ++numret;
+
+  return numret;
+}
+
+int winapi_GetMessageExtraInfo( lua_State *L )
+{
+  int numret = 0;
+  LPARAM retval;
+
+
+  retval = 
+    GetMessageExtraInfo(
+    );
+
+  // marshal retval
+  lua_pushlightuserdata(L, (void*)retval); ++numret;
+
+  return numret;
+}
+
+int winapi_SetMessageExtraInfo( lua_State *L )
+{
+  int numret = 0;
+  LPARAM retval;
+  LPARAM p1;
+
+  p1 = (LPARAM)lua_tolwparam(L, 1);
+
+  retval = 
+    SetMessageExtraInfo(
+      p1
+    );
+
+  // marshal retval
+  lua_pushlightuserdata(L, (void*)retval); ++numret;
 
   return numret;
 }
@@ -2713,7 +3020,7 @@ int winapi_GetMessageW( lua_State *L )
   UINT p3;
   UINT p4;
 
-  p1 = (MSG*)luacwrap_checktype(L, 1, &regType_MSG.hdr);
+  p1 = (MSG*)g_luacwrapiface->checktype(L, 1, &regType_MSG.hdr);
   p2 = lua_toWindow(L, 2);
   p3 = (UINT)lua_tonumber(L, 3);
   p4 = (UINT)lua_tonumber(L, 4);
@@ -2726,7 +3033,7 @@ int winapi_GetMessageW( lua_State *L )
       p4
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -2754,7 +3061,7 @@ int winapi_PostMessageW( lua_State *L )
       p4
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -2782,7 +3089,7 @@ int winapi_PostThreadMessageW( lua_State *L )
       p4
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -2798,6 +3105,9 @@ int winapi_SendMessageW( lua_State *L )
   LPARAM p4;
 
   p1 = lua_toWindow(L, 1);
+  if (lua_isnil(L, 2))  {
+    luaL_error(L, "nil is not allowed for parameter #2");
+  }
   p2 = (UINT)lua_tonumber(L, 2);
   p3 = (WPARAM)lua_tolwparam(L, 3);
   p4 = (LPARAM)lua_tolwparam(L, 4);
@@ -2810,7 +3120,7 @@ int winapi_SendMessageW( lua_State *L )
       p4
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushnumber(L, retval); ++numret;
 
   return numret;
@@ -2826,7 +3136,7 @@ int winapi_PeekMessageW( lua_State *L )
   UINT p4;
   UINT p5;
 
-  p1 = (MSG*)luacwrap_checktype(L, 1, &regType_MSG.hdr);
+  p1 = (MSG*)g_luacwrapiface->checktype(L, 1, &regType_MSG.hdr);
   p2 = lua_toWindow(L, 2);
   p3 = (UINT)lua_tonumber(L, 3);
   p4 = (UINT)lua_tonumber(L, 4);
@@ -2841,7 +3151,7 @@ int winapi_PeekMessageW( lua_State *L )
       p5
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -2858,7 +3168,7 @@ int winapi_WaitMessage( lua_State *L )
     WaitMessage(
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -2882,7 +3192,7 @@ int winapi_WaitForInputIdle( lua_State *L )
       p2
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushnumber(L, retval); ++numret;
 
   return numret;
@@ -2895,14 +3205,14 @@ int winapi_TranslateMessage( lua_State *L )
   BOOL retval;
   MSG* p1;
 
-  p1 = (MSG*)luacwrap_checktype(L, 1, &regType_MSG.hdr);
+  p1 = (MSG*)g_luacwrapiface->checktype(L, 1, &regType_MSG.hdr);
 
   retval = 
     TranslateMessage(
       p1
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -2914,14 +3224,14 @@ int winapi_DispatchMessageW( lua_State *L )
   LRESULT retval;
   MSG* p1;
 
-  p1 = (MSG*)luacwrap_checktype(L, 1, &regType_MSG.hdr);
+  p1 = (MSG*)g_luacwrapiface->checktype(L, 1, &regType_MSG.hdr);
 
   retval = 
     DispatchMessageW(
       p1
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushnumber(L, retval); ++numret;
 
   return numret;
@@ -2935,7 +3245,7 @@ int winapi_IsDialogMessageW( lua_State *L )
   MSG* p2;
 
   p1 = lua_toWindow(L, 1);
-  p2 = (MSG*)luacwrap_checktype(L, 2, &regType_MSG.hdr);
+  p2 = (MSG*)g_luacwrapiface->checktype(L, 2, &regType_MSG.hdr);
 
   retval = 
     IsDialogMessageW(
@@ -2943,7 +3253,7 @@ int winapi_IsDialogMessageW( lua_State *L )
       p2
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -2956,7 +3266,7 @@ int winapi_CreateAcceleratorTableW( lua_State *L )
   ACCEL* p1;
   int p2;
 
-  p1 = (ACCEL*)luacwrap_checktype(L, 1, &regType_ACCEL.hdr);
+  p1 = (ACCEL*)g_luacwrapiface->checktype(L, 1, &regType_ACCEL.hdr);
   p2 = lua_tointeger(L, 2);
 
   retval = 
@@ -2965,7 +3275,7 @@ int winapi_CreateAcceleratorTableW( lua_State *L )
       p2
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushlightuserdata(L, (PVOID)retval); ++numret;
 
   return numret;
@@ -2981,7 +3291,7 @@ int winapi_TranslateAcceleratorW( lua_State *L )
 
   p1 = lua_toWindow(L, 1);
   p2 = (HACCEL)lua_tohandle(L, 2);
-  p3 = (MSG*)luacwrap_checktype(L, 3, &regType_MSG.hdr);
+  p3 = (MSG*)g_luacwrapiface->checktype(L, 3, &regType_MSG.hdr);
 
   retval = 
     TranslateAcceleratorW(
@@ -2990,7 +3300,7 @@ int winapi_TranslateAcceleratorW( lua_State *L )
       p3
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -3018,7 +3328,7 @@ int winapi_DefWindowProcW( lua_State *L )
       p4
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushnumber(L, retval); ++numret;
 
   return numret;
@@ -3049,7 +3359,7 @@ int winapi_CallWindowProcW( lua_State *L )
       p5
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushnumber(L, retval); ++numret;
 
   return numret;
@@ -3071,7 +3381,7 @@ int winapi_GetWindowLongW( lua_State *L )
       p2
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -3096,7 +3406,7 @@ int winapi_SetWindowLongW( lua_State *L )
       p3
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -3129,7 +3439,7 @@ int winapi_GetDC( lua_State *L )
       p1
     );
 
-  // marshal retval  
+  // marshal retval
   numret += lua_pushDC(L, retval);
 
   return numret;
@@ -3154,7 +3464,7 @@ int winapi_GetDCEx( lua_State *L )
       p3
     );
 
-  // marshal retval  
+  // marshal retval
   numret += lua_pushDC(L, retval);
 
   return numret;
@@ -3173,7 +3483,7 @@ int winapi_GetWindowDC( lua_State *L )
       p1
     );
 
-  // marshal retval  
+  // marshal retval
   numret += lua_pushDC(L, retval);
 
   return numret;
@@ -3195,7 +3505,7 @@ int winapi_ReleaseDC( lua_State *L )
       p2
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -3209,7 +3519,7 @@ int winapi_BeginPaint( lua_State *L )
   PAINTSTRUCT* p2;
 
   p1 = lua_toWindow(L, 1);
-  p2 = (PAINTSTRUCT*)luacwrap_checktype(L, 2, &regType_PAINTSTRUCT.hdr);
+  p2 = (PAINTSTRUCT*)g_luacwrapiface->checktype(L, 2, &regType_PAINTSTRUCT.hdr);
 
   retval = 
     BeginPaint(
@@ -3217,7 +3527,7 @@ int winapi_BeginPaint( lua_State *L )
       p2
     );
 
-  // marshal retval  
+  // marshal retval
   numret += lua_pushDC(L, retval);
 
   return numret;
@@ -3231,7 +3541,7 @@ int winapi_EndPaint( lua_State *L )
   PAINTSTRUCT* p2;
 
   p1 = lua_toWindow(L, 1);
-  p2 = (PAINTSTRUCT*)luacwrap_checktype(L, 2, &regType_PAINTSTRUCT.hdr);
+  p2 = (PAINTSTRUCT*)g_luacwrapiface->checktype(L, 2, &regType_PAINTSTRUCT.hdr);
 
   retval = 
     EndPaint(
@@ -3239,7 +3549,7 @@ int winapi_EndPaint( lua_State *L )
       p2
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -3256,7 +3566,7 @@ int winapi_InvalidateRect( lua_State *L )
   p1 = lua_toWindow(L, 1);
   if (!lua_isnil(L, 2))
   {
-    p2 = (RECT*)luacwrap_checktype(L, 2, &regType_RECT.hdr);
+    p2 = (RECT*)g_luacwrapiface->checktype(L, 2, &regType_RECT.hdr);
   }
   p3 = lua_tointeger(L, 3);
 
@@ -3267,7 +3577,7 @@ int winapi_InvalidateRect( lua_State *L )
       p3
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -3281,7 +3591,7 @@ int winapi_ValidateRect( lua_State *L )
   RECT* p2;
 
   p1 = lua_toWindow(L, 1);
-  p2 = (RECT*)luacwrap_checktype(L, 2, &regType_RECT.hdr);
+  p2 = (RECT*)g_luacwrapiface->checktype(L, 2, &regType_RECT.hdr);
 
   retval = 
     ValidateRect(
@@ -3289,7 +3599,7 @@ int winapi_ValidateRect( lua_State *L )
       p2
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -3303,7 +3613,7 @@ int winapi_GetClientRect( lua_State *L )
   RECT* p2;
 
   p1 = lua_toWindow(L, 1);
-  p2 = (RECT*)luacwrap_checktype(L, 2, &regType_RECT.hdr);
+  p2 = (RECT*)g_luacwrapiface->checktype(L, 2, &regType_RECT.hdr);
 
   retval = 
     GetClientRect(
@@ -3311,7 +3621,7 @@ int winapi_GetClientRect( lua_State *L )
       p2
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -3325,7 +3635,7 @@ int winapi_GetWindowRect( lua_State *L )
   RECT* p2;
 
   p1 = lua_toWindow(L, 1);
-  p2 = (RECT*)luacwrap_checktype(L, 2, &regType_RECT.hdr);
+  p2 = (RECT*)g_luacwrapiface->checktype(L, 2, &regType_RECT.hdr);
 
   retval = 
     GetWindowRect(
@@ -3333,7 +3643,7 @@ int winapi_GetWindowRect( lua_State *L )
       p2
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -3347,7 +3657,7 @@ int winapi_ClientToScreen( lua_State *L )
   POINT* p2;
 
   p1 = lua_toWindow(L, 1);
-  p2 = (POINT*)luacwrap_checktype(L, 2, &regType_POINT.hdr);
+  p2 = (POINT*)g_luacwrapiface->checktype(L, 2, &regType_POINT.hdr);
 
   retval = 
     ClientToScreen(
@@ -3355,7 +3665,7 @@ int winapi_ClientToScreen( lua_State *L )
       p2
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -3369,7 +3679,7 @@ int winapi_ScreenToClient( lua_State *L )
   POINT* p2;
 
   p1 = lua_toWindow(L, 1);
-  p2 = (POINT*)luacwrap_checktype(L, 2, &regType_POINT.hdr);
+  p2 = (POINT*)g_luacwrapiface->checktype(L, 2, &regType_POINT.hdr);
 
   retval = 
     ScreenToClient(
@@ -3377,7 +3687,7 @@ int winapi_ScreenToClient( lua_State *L )
       p2
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -3394,7 +3704,7 @@ int winapi_MapWindowPoints( lua_State *L )
 
   p1 = lua_toWindow(L, 1);
   p2 = lua_toWindow(L, 2);
-  p3 = (POINT*)luacwrap_checktype(L, 3, &regType_POINT.hdr);
+  p3 = (POINT*)g_luacwrapiface->checktype(L, 3, &regType_POINT.hdr);
   p4 = (UINT)lua_tonumber(L, 4);
 
   retval = 
@@ -3405,7 +3715,7 @@ int winapi_MapWindowPoints( lua_State *L )
       p4
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -3417,14 +3727,14 @@ int winapi_GetCursorPos( lua_State *L )
   BOOL retval;
   POINT* p1;
 
-  p1 = (POINT*)luacwrap_checktype(L, 1, &regType_POINT.hdr);
+  p1 = (POINT*)g_luacwrapiface->checktype(L, 1, &regType_POINT.hdr);
 
   retval = 
     GetCursorPos(
       p1
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -3440,7 +3750,7 @@ int winapi_GetCapture( lua_State *L )
     GetCapture(
     );
 
-  // marshal retval  
+  // marshal retval
   numret += lua_pushWindow(L, retval);
 
   return numret;
@@ -3459,7 +3769,7 @@ int winapi_SetCapture( lua_State *L )
       p1
     );
 
-  // marshal retval  
+  // marshal retval
   numret += lua_pushWindow(L, retval);
 
   return numret;
@@ -3475,7 +3785,7 @@ int winapi_ReleaseCapture( lua_State *L )
     ReleaseCapture(
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -3490,7 +3800,7 @@ int winapi_AdjustWindowRect( lua_State *L )
   DWORD p2;
   BOOL p3;
 
-  p1 = (RECT*)luacwrap_checktype(L, 1, &regType_RECT.hdr);
+  p1 = (RECT*)g_luacwrapiface->checktype(L, 1, &regType_RECT.hdr);
   p2 = (DWORD)lua_tonumber(L, 2);
   p3 = lua_tointeger(L, 3);
 
@@ -3501,7 +3811,7 @@ int winapi_AdjustWindowRect( lua_State *L )
       p3
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -3517,7 +3827,7 @@ int winapi_AdjustWindowRectEx( lua_State *L )
   BOOL p3;
   DWORD p4;
 
-  p1 = (RECT*)luacwrap_checktype(L, 1, &regType_RECT.hdr);
+  p1 = (RECT*)g_luacwrapiface->checktype(L, 1, &regType_RECT.hdr);
   p2 = (DWORD)lua_tonumber(L, 2);
   p3 = lua_tointeger(L, 3);
   p4 = (DWORD)lua_tonumber(L, 4);
@@ -3530,7 +3840,7 @@ int winapi_AdjustWindowRectEx( lua_State *L )
       p4
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -3561,7 +3871,7 @@ int winapi_MessageBoxW( lua_State *L )
       p4
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -3596,7 +3906,7 @@ int winapi_MessageBoxExW( lua_State *L )
       p5
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -3616,7 +3926,7 @@ int winapi_MessageBeep( lua_State *L )
       p1
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -3639,7 +3949,7 @@ int winapi_Beep( lua_State *L )
       p2
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -3660,7 +3970,7 @@ int winapi_GetTopWindow( lua_State *L )
       p1
     );
 
-  // marshal retval  
+  // marshal retval
   numret += lua_pushWindow(L, retval);
 
   return numret;
@@ -3681,7 +3991,7 @@ int winapi_GetLastActivePopup( lua_State *L )
       p1
     );
 
-  // marshal retval  
+  // marshal retval
   numret += lua_pushWindow(L, retval);
 
   return numret;
@@ -3704,7 +4014,7 @@ int winapi_GetWindow( lua_State *L )
       p2
     );
 
-  // marshal retval  
+  // marshal retval
   numret += lua_pushWindow(L, retval);
 
   return numret;
@@ -3732,7 +4042,7 @@ int winapi_RegisterHotKey( lua_State *L )
       p4
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -3754,7 +4064,7 @@ int winapi_UnregisterHotKey( lua_State *L )
       p2
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -3774,7 +4084,7 @@ int winapi_AllKeys( lua_State *L )
       p1
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -3794,7 +4104,7 @@ int winapi_GetSysColor( lua_State *L )
       p1
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushnumber(L, retval); ++numret;
 
   return numret;
@@ -3813,7 +4123,7 @@ int winapi_GetSysColorBrush( lua_State *L )
       p1
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushlightuserdata(L, (PVOID)retval); ++numret;
 
   return numret;
@@ -3827,7 +4137,7 @@ int winapi_DrawFocusRect( lua_State *L )
   RECT* p2;
 
   p1 = lua_toDC(L, 1);
-  p2 = (RECT*)luacwrap_checktype(L, 2, &regType_RECT.hdr);
+  p2 = (RECT*)g_luacwrapiface->checktype(L, 2, &regType_RECT.hdr);
 
   retval = 
     DrawFocusRect(
@@ -3835,7 +4145,7 @@ int winapi_DrawFocusRect( lua_State *L )
       p2
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -3851,7 +4161,7 @@ int winapi_DrawEdge( lua_State *L )
   UINT p4;
 
   p1 = lua_toDC(L, 1);
-  p2 = (RECT*)luacwrap_checktype(L, 2, &regType_RECT.hdr);
+  p2 = (RECT*)g_luacwrapiface->checktype(L, 2, &regType_RECT.hdr);
   p3 = (UINT)lua_tonumber(L, 3);
   p4 = (UINT)lua_tonumber(L, 4);
 
@@ -3863,7 +4173,7 @@ int winapi_DrawEdge( lua_State *L )
       p4
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -3879,7 +4189,7 @@ int winapi_DrawFrameControl( lua_State *L )
   UINT p4;
 
   p1 = lua_toDC(L, 1);
-  p2 = (RECT*)luacwrap_checktype(L, 2, &regType_RECT.hdr);
+  p2 = (RECT*)g_luacwrapiface->checktype(L, 2, &regType_RECT.hdr);
   p3 = (UINT)lua_tonumber(L, 3);
   p4 = (UINT)lua_tonumber(L, 4);
 
@@ -3891,7 +4201,7 @@ int winapi_DrawFrameControl( lua_State *L )
       p4
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -3909,7 +4219,7 @@ int winapi_DrawCaption( lua_State *L )
 
   p1 = lua_toWindow(L, 1);
   p2 = lua_toDC(L, 2);
-  p3 = (RECT*)luacwrap_checktype(L, 3, &regType_RECT.hdr);
+  p3 = (RECT*)g_luacwrapiface->checktype(L, 3, &regType_RECT.hdr);
   p4 = (UINT)lua_tonumber(L, 4);
 
   retval = 
@@ -3920,7 +4230,7 @@ int winapi_DrawCaption( lua_State *L )
       p4
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -3939,8 +4249,8 @@ int winapi_DrawAnimatedRects( lua_State *L )
 
   p1 = lua_toWindow(L, 1);
   p2 = lua_tointeger(L, 2);
-  p3 = (RECT*)luacwrap_checktype(L, 3, &regType_RECT.hdr);
-  p4 = (RECT*)luacwrap_checktype(L, 4, &regType_RECT.hdr);
+  p3 = (RECT*)g_luacwrapiface->checktype(L, 3, &regType_RECT.hdr);
+  p4 = (RECT*)g_luacwrapiface->checktype(L, 4, &regType_RECT.hdr);
 
   retval = 
     DrawAnimatedRects(
@@ -3950,7 +4260,7 @@ int winapi_DrawAnimatedRects( lua_State *L )
       p4
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -3970,7 +4280,7 @@ int winapi_DrawTextW( lua_State *L )
   p1 = lua_toDC(L, 1);
   p2 = (LPCWSTR)lua_tostring(L, 2);
   p3 = lua_tointeger(L, 3);
-  p4 = (RECT*)luacwrap_checktype(L, 4, &regType_RECT.hdr);
+  p4 = (RECT*)g_luacwrapiface->checktype(L, 4, &regType_RECT.hdr);
   p5 = (UINT)lua_tonumber(L, 5);
 
   retval = 
@@ -3982,7 +4292,7 @@ int winapi_DrawTextW( lua_State *L )
       p5
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -3997,7 +4307,7 @@ int winapi_FillRect( lua_State *L )
   HBRUSH p3;
 
   p1 = lua_toDC(L, 1);
-  p2 = (RECT*)luacwrap_checktype(L, 2, &regType_RECT.hdr);
+  p2 = (RECT*)g_luacwrapiface->checktype(L, 2, &regType_RECT.hdr);
   p3 = (HBRUSH)lua_tohandle(L, 3);
 
   retval = 
@@ -4007,7 +4317,7 @@ int winapi_FillRect( lua_State *L )
       p3
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -4023,7 +4333,7 @@ int winapi_FrameRect( lua_State *L )
   HBRUSH p3;
 
   p1 = lua_toDC(L, 1);
-  p2 = (RECT*)luacwrap_checktype(L, 2, &regType_RECT.hdr);
+  p2 = (RECT*)g_luacwrapiface->checktype(L, 2, &regType_RECT.hdr);
   p3 = (HBRUSH)lua_tohandle(L, 3);
 
   retval = 
@@ -4033,7 +4343,7 @@ int winapi_FrameRect( lua_State *L )
       p3
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -4048,7 +4358,7 @@ int winapi_InvertRect( lua_State *L )
   RECT* p2;
 
   p1 = lua_toDC(L, 1);
-  p2 = (RECT*)luacwrap_checktype(L, 2, &regType_RECT.hdr);
+  p2 = (RECT*)g_luacwrapiface->checktype(L, 2, &regType_RECT.hdr);
 
   retval = 
     InvertRect(
@@ -4056,7 +4366,7 @@ int winapi_InvertRect( lua_State *L )
       p2
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -4090,7 +4400,7 @@ int winapi_LoadImageW( lua_State *L )
       p6
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushlightuserdata(L, (PVOID)retval); ++numret;
 
   return numret;
@@ -4112,7 +4422,7 @@ int winapi_LoadCursorW( lua_State *L )
       p2
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushlightuserdata(L, (PVOID)retval); ++numret;
 
   return numret;
@@ -4131,8 +4441,506 @@ int winapi_SetCursor( lua_State *L )
       p1
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushlightuserdata(L, (PVOID)retval); ++numret;
+
+  return numret;
+}
+
+int winapi_CreateDialogParamW( lua_State *L )
+{
+  int numret = 0;
+  HWND retval;
+  HINSTANCE p1;
+  LPCWSTR p2;
+  HWND p3;
+  DLGPROC p4;
+  LPARAM p5;
+
+  p1 = (HINSTANCE)lua_tohandle(L, 1);
+  p2 = (LPCWSTR)lua_tostring(L, 2);
+  p3 = lua_toWindow(L, 3);
+  p4 = (DLGPROC)lua_tohandle(L, 4);
+  p5 = (LPARAM)lua_tolwparam(L, 5);
+
+  retval = 
+    CreateDialogParamW(
+      p1,
+      p2,
+      p3,
+      p4,
+      p5
+    );
+
+  // marshal retval
+  numret += lua_pushWindow(L, retval);
+
+  return numret;
+}
+
+int winapi_CreateDialogIndirectParamW( lua_State *L )
+{
+  int numret = 0;
+  HWND retval;
+  HINSTANCE p1;
+  DLGTEMPLATE* p2;
+  HWND p3;
+  DLGPROC p4;
+  LPARAM p5;
+
+  p1 = (HINSTANCE)lua_tohandle(L, 1);
+  p2 = (DLGTEMPLATE*)g_luacwrapiface->checktype(L, 2, &regType_DLGTEMPLATE.hdr);
+  p3 = lua_toWindow(L, 3);
+  p4 = (DLGPROC)lua_tohandle(L, 4);
+  p5 = (LPARAM)lua_tolwparam(L, 5);
+
+  retval = 
+    CreateDialogIndirectParamW(
+      p1,
+      p2,
+      p3,
+      p4,
+      p5
+    );
+
+  // marshal retval
+  numret += lua_pushWindow(L, retval);
+
+  return numret;
+}
+
+int winapi_DialogBoxParamW( lua_State *L )
+{
+  int numret = 0;
+  INT_PTR retval;
+  HINSTANCE p1;
+  LPCWSTR p2;
+  HWND p3;
+  DLGPROC p4;
+  LPARAM p5;
+
+  p1 = (HINSTANCE)lua_tohandle(L, 1);
+  p2 = (LPCWSTR)lua_tostring(L, 2);
+  p3 = lua_toWindow(L, 3);
+  p4 = (DLGPROC)lua_tohandle(L, 4);
+  p5 = (LPARAM)lua_tolwparam(L, 5);
+
+  retval = 
+    DialogBoxParamW(
+      p1,
+      p2,
+      p3,
+      p4,
+      p5
+    );
+
+  // marshal retval
+  lua_pushnumber(L, retval); ++numret;
+
+  return numret;
+}
+
+int winapi_DialogBoxIndirectParamW( lua_State *L )
+{
+  int numret = 0;
+  INT_PTR retval;
+  HINSTANCE p1;
+  DLGTEMPLATE* p2;
+  HWND p3;
+  DLGPROC p4;
+  LPARAM p5;
+
+  p1 = (HINSTANCE)lua_tohandle(L, 1);
+  p2 = (DLGTEMPLATE*)g_luacwrapiface->checktype(L, 2, &regType_DLGTEMPLATE.hdr);
+  p3 = lua_toWindow(L, 3);
+  p4 = (DLGPROC)lua_tohandle(L, 4);
+  p5 = (LPARAM)lua_tolwparam(L, 5);
+
+  retval = 
+    DialogBoxIndirectParamW(
+      p1,
+      p2,
+      p3,
+      p4,
+      p5
+    );
+
+  // marshal retval
+  lua_pushnumber(L, retval); ++numret;
+
+  return numret;
+}
+
+int winapi_EndDialog( lua_State *L )
+{
+  int numret = 0;
+  BOOL retval;
+  HWND p1;
+  INT_PTR p2;
+
+  p1 = lua_toWindow(L, 1);
+  p2 = (INT_PTR)lua_tonumber(L, 2);
+
+  retval = 
+    EndDialog(
+      p1,
+      p2
+    );
+
+  // marshal retval
+  lua_pushinteger(L, retval); ++numret;
+
+  return numret;
+}
+
+int winapi_GetDlgItem( lua_State *L )
+{
+  int numret = 0;
+  HWND retval;
+  HWND p1;
+  int p2;
+
+  p1 = lua_toWindow(L, 1);
+  p2 = lua_tointeger(L, 2);
+
+  retval = 
+    GetDlgItem(
+      p1,
+      p2
+    );
+
+  // marshal retval
+  numret += lua_pushWindow(L, retval);
+
+  return numret;
+}
+
+int winapi_SetDlgItemInt( lua_State *L )
+{
+  int numret = 0;
+  BOOL retval;
+  HWND p1;
+  int p2;
+  UINT p3;
+  BOOL p4;
+
+  p1 = lua_toWindow(L, 1);
+  p2 = lua_tointeger(L, 2);
+  p3 = (UINT)lua_tonumber(L, 3);
+  p4 = lua_tointeger(L, 4);
+
+  retval = 
+    SetDlgItemInt(
+      p1,
+      p2,
+      p3,
+      p4
+    );
+
+  // marshal retval
+  lua_pushinteger(L, retval); ++numret;
+
+  return numret;
+}
+
+int winapi_GetDlgItemInt( lua_State *L )
+{
+  int numret = 0;
+  UINT retval;
+  HWND p1;
+  int p2;
+  BOOL p3;
+  BOOL p4;
+
+  p1 = lua_toWindow(L, 1);
+  p2 = lua_tointeger(L, 2);
+  p3 = lua_tointeger(L, 3);
+  p4 = lua_tointeger(L, 4);
+
+  retval = 
+    GetDlgItemInt(
+      p1,
+      p2,
+      &p3,
+      p4
+    );
+
+  // marshal retval
+  lua_pushnumber(L, retval); ++numret;
+
+  // TODO: marshal BOOL
+
+  return numret;
+}
+
+int winapi_SetDlgItemTextW( lua_State *L )
+{
+  int numret = 0;
+  BOOL retval;
+  HWND p1;
+  int p2;
+  LPCWSTR p3;
+
+  p1 = lua_toWindow(L, 1);
+  p2 = lua_tointeger(L, 2);
+  p3 = (LPCWSTR)lua_tostring(L, 3);
+
+  retval = 
+    SetDlgItemTextW(
+      p1,
+      p2,
+      p3
+    );
+
+  // marshal retval
+  lua_pushinteger(L, retval); ++numret;
+
+  return numret;
+}
+
+int winapi_GetDlgItemTextW( lua_State *L )
+{
+  int numret = 0;
+  UINT retval;
+  HWND p1;
+  int p2;
+  LPWSTR p3;
+  int p4;
+
+  p1 = lua_toWindow(L, 1);
+  p2 = lua_tointeger(L, 2);
+  p3 = (LPWSTR)lua_tostring(L, 3);
+  p4 = lua_tointeger(L, 4);
+
+  retval = 
+    GetDlgItemTextW(
+      p1,
+      p2,
+      p3,
+      p4
+    );
+
+  // marshal retval
+  lua_pushnumber(L, retval); ++numret;
+
+  return numret;
+}
+
+int winapi_CheckDlgButton( lua_State *L )
+{
+  int numret = 0;
+  BOOL retval;
+  HWND p1;
+  int p2;
+  UINT p3;
+
+  p1 = lua_toWindow(L, 1);
+  p2 = lua_tointeger(L, 2);
+  p3 = (UINT)lua_tonumber(L, 3);
+
+  retval = 
+    CheckDlgButton(
+      p1,
+      p2,
+      p3
+    );
+
+  // marshal retval
+  lua_pushinteger(L, retval); ++numret;
+
+  return numret;
+}
+
+int winapi_CheckRadioButton( lua_State *L )
+{
+  int numret = 0;
+  BOOL retval;
+  HWND p1;
+  int p2;
+  int p3;
+  int p4;
+
+  p1 = lua_toWindow(L, 1);
+  p2 = lua_tointeger(L, 2);
+  p3 = lua_tointeger(L, 3);
+  p4 = lua_tointeger(L, 4);
+
+  retval = 
+    CheckRadioButton(
+      p1,
+      p2,
+      p3,
+      p4
+    );
+
+  // marshal retval
+  lua_pushinteger(L, retval); ++numret;
+
+  return numret;
+}
+
+int winapi_IsDlgButtonChecked( lua_State *L )
+{
+  int numret = 0;
+  UINT retval;
+  HWND p1;
+  int p2;
+
+  p1 = lua_toWindow(L, 1);
+  p2 = lua_tointeger(L, 2);
+
+  retval = 
+    IsDlgButtonChecked(
+      p1,
+      p2
+    );
+
+  // marshal retval
+  lua_pushnumber(L, retval); ++numret;
+
+  return numret;
+}
+
+int winapi_SendDlgItemMessageW( lua_State *L )
+{
+  int numret = 0;
+  LRESULT retval;
+  HWND p1;
+  int p2;
+  UINT p3;
+  WPARAM p4;
+  LPARAM p5;
+
+  p1 = lua_toWindow(L, 1);
+  p2 = lua_tointeger(L, 2);
+  p3 = (UINT)lua_tonumber(L, 3);
+  p4 = (WPARAM)lua_tolwparam(L, 4);
+  p5 = (LPARAM)lua_tolwparam(L, 5);
+
+  retval = 
+    SendDlgItemMessageW(
+      p1,
+      p2,
+      p3,
+      p4,
+      p5
+    );
+
+  // marshal retval
+  lua_pushnumber(L, retval); ++numret;
+
+  return numret;
+}
+
+int winapi_GetNextDlgGroupItem( lua_State *L )
+{
+  int numret = 0;
+  HWND retval;
+  HWND p1;
+  HWND p2;
+  BOOL p3;
+
+  p1 = lua_toWindow(L, 1);
+  p2 = lua_toWindow(L, 2);
+  p3 = lua_tointeger(L, 3);
+
+  retval = 
+    GetNextDlgGroupItem(
+      p1,
+      p2,
+      p3
+    );
+
+  // marshal retval
+  numret += lua_pushWindow(L, retval);
+
+  return numret;
+}
+
+int winapi_GetNextDlgTabItem( lua_State *L )
+{
+  int numret = 0;
+  HWND retval;
+  HWND p1;
+  HWND p2;
+  BOOL p3;
+
+  p1 = lua_toWindow(L, 1);
+  p2 = lua_toWindow(L, 2);
+  p3 = lua_tointeger(L, 3);
+
+  retval = 
+    GetNextDlgTabItem(
+      p1,
+      p2,
+      p3
+    );
+
+  // marshal retval
+  numret += lua_pushWindow(L, retval);
+
+  return numret;
+}
+
+int winapi_GetDlgCtrlID( lua_State *L )
+{
+  int numret = 0;
+  int retval;
+  HWND p1;
+
+  p1 = lua_toWindow(L, 1);
+
+  retval = 
+    GetDlgCtrlID(
+      p1
+    );
+
+  // marshal retval
+  lua_pushinteger(L, retval); ++numret;
+
+  return numret;
+}
+
+int winapi_GetDialogBaseUnits( lua_State *L )
+{
+  int numret = 0;
+  long retval;
+
+
+  retval = 
+    GetDialogBaseUnits(
+    );
+
+  // marshal retval
+  
+
+  return numret;
+}
+
+int winapi_DefDlgProcW( lua_State *L )
+{
+  int numret = 0;
+  LRESULT retval;
+  HWND p1;
+  UINT p2;
+  WPARAM p3;
+  LPARAM p4;
+
+  p1 = lua_toWindow(L, 1);
+  p2 = (UINT)lua_tonumber(L, 2);
+  p3 = (WPARAM)lua_tolwparam(L, 3);
+  p4 = (LPARAM)lua_tolwparam(L, 4);
+
+  retval = 
+    DefDlgProcW(
+      p1,
+      p2,
+      p3,
+      p4
+    );
+
+  // marshal retval
+  lua_pushnumber(L, retval); ++numret;
 
   return numret;
 }
@@ -4150,7 +4958,7 @@ int winapi_DeleteObject( lua_State *L )
       p1
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -4175,7 +4983,7 @@ int winapi_GetObjectW( lua_State *L )
       p3
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -4194,7 +5002,7 @@ int winapi_GetObjectType( lua_State *L )
       p1
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushnumber(L, retval); ++numret;
 
   return numret;
@@ -4213,7 +5021,7 @@ int winapi_GetStockObject( lua_State *L )
       p1
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushlightuserdata(L, (PVOID)retval); ++numret;
 
   return numret;
@@ -4235,7 +5043,7 @@ int winapi_SelectObject( lua_State *L )
       p2
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushlightuserdata(L, (PVOID)retval); ++numret;
 
   return numret;
@@ -4254,7 +5062,7 @@ int winapi_CreateCompatibleDC( lua_State *L )
       p1
     );
 
-  // marshal retval  
+  // marshal retval
   numret += lua_pushDC(L, retval);
 
   return numret;
@@ -4273,7 +5081,7 @@ int winapi_DeleteDC( lua_State *L )
       p1
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -4304,7 +5112,7 @@ int winapi_ExcludeClipRect( lua_State *L )
       p5
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -4335,7 +5143,7 @@ int winapi_IntersectClipRect( lua_State *L )
       p5
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -4357,7 +5165,7 @@ int winapi_GetCurrentObject( lua_State *L )
       p2
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushlightuserdata(L, (PVOID)retval); ++numret;
 
   return numret;
@@ -4389,7 +5197,7 @@ int winapi_FrameRgn( lua_State *L )
       p5
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -4413,7 +5221,7 @@ int winapi_InvertRgn( lua_State *L )
       p2
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -4437,7 +5245,7 @@ int winapi_PaintRgn( lua_State *L )
       p2
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -4460,7 +5268,7 @@ int winapi_SetBkColor( lua_State *L )
       p2
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushnumber(L, retval); ++numret;
 
   return numret;
@@ -4479,7 +5287,7 @@ int winapi_GetBkColor( lua_State *L )
       p1
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushnumber(L, retval); ++numret;
 
   return numret;
@@ -4502,7 +5310,7 @@ int winapi_SetDCBrushColor( lua_State *L )
       p2
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushnumber(L, retval); ++numret;
 
   return numret;
@@ -4523,7 +5331,7 @@ int winapi_GetDCBrushColor( lua_State *L )
       p1
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushnumber(L, retval); ++numret;
 
   return numret;
@@ -4547,7 +5355,7 @@ int winapi_SetDCPenColor( lua_State *L )
       p2
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushnumber(L, retval); ++numret;
 
   return numret;
@@ -4568,7 +5376,7 @@ int winapi_GetDCPenColor( lua_State *L )
       p1
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushnumber(L, retval); ++numret;
 
   return numret;
@@ -4591,7 +5399,7 @@ int winapi_SetBkMode( lua_State *L )
       p2
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -4610,7 +5418,7 @@ int winapi_GetBkMode( lua_State *L )
       p1
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -4633,7 +5441,7 @@ int winapi_SetMapMode( lua_State *L )
       p2
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -4657,7 +5465,7 @@ int winapi_SetPolyFillMode( lua_State *L )
       p2
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -4680,7 +5488,7 @@ int winapi_SetTextColor( lua_State *L )
       p2
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushnumber(L, retval); ++numret;
 
   return numret;
@@ -4702,7 +5510,7 @@ int winapi_SetTextAlign( lua_State *L )
       p2
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushnumber(L, retval); ++numret;
 
   return numret;
@@ -4728,7 +5536,7 @@ int winapi_SetTextJustification( lua_State *L )
       p3
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -4755,7 +5563,7 @@ int winapi_PtVisible( lua_State *L )
       p3
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -4770,7 +5578,7 @@ int winapi_RectVisible( lua_State *L )
   RECT* p2;
 
   p1 = lua_toDC(L, 1);
-  p2 = (RECT*)luacwrap_checktype(L, 2, &regType_RECT.hdr);
+  p2 = (RECT*)g_luacwrapiface->checktype(L, 2, &regType_RECT.hdr);
 
   retval = 
     RectVisible(
@@ -4778,7 +5586,7 @@ int winapi_RectVisible( lua_State *L )
       p2
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -4797,7 +5605,7 @@ int winapi_SetViewportExtEx( lua_State *L )
   p1 = lua_toDC(L, 1);
   p2 = lua_tointeger(L, 2);
   p3 = lua_tointeger(L, 3);
-  p4 = (SIZE*)luacwrap_checktype(L, 4, &regType_SIZE.hdr);
+  p4 = (SIZE*)g_luacwrapiface->checktype(L, 4, &regType_SIZE.hdr);
 
   retval = 
     SetViewportExtEx(
@@ -4807,7 +5615,7 @@ int winapi_SetViewportExtEx( lua_State *L )
       p4
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -4827,7 +5635,7 @@ int winapi_SetViewportOrgEx( lua_State *L )
   p1 = lua_toDC(L, 1);
   p2 = lua_tointeger(L, 2);
   p3 = lua_tointeger(L, 3);
-  p4 = (POINT*)luacwrap_checktype(L, 4, &regType_POINT.hdr);
+  p4 = (POINT*)g_luacwrapiface->checktype(L, 4, &regType_POINT.hdr);
 
   retval = 
     SetViewportOrgEx(
@@ -4837,7 +5645,7 @@ int winapi_SetViewportOrgEx( lua_State *L )
       p4
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -4857,7 +5665,7 @@ int winapi_SetWindowExtEx( lua_State *L )
   p1 = lua_toDC(L, 1);
   p2 = lua_tointeger(L, 2);
   p3 = lua_tointeger(L, 3);
-  p4 = (SIZE*)luacwrap_checktype(L, 4, &regType_SIZE.hdr);
+  p4 = (SIZE*)g_luacwrapiface->checktype(L, 4, &regType_SIZE.hdr);
 
   retval = 
     SetWindowExtEx(
@@ -4867,7 +5675,7 @@ int winapi_SetWindowExtEx( lua_State *L )
       p4
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -4887,7 +5695,7 @@ int winapi_SetWindowOrgEx( lua_State *L )
   p1 = lua_toDC(L, 1);
   p2 = lua_tointeger(L, 2);
   p3 = lua_tointeger(L, 3);
-  p4 = (POINT*)luacwrap_checktype(L, 4, &regType_POINT.hdr);
+  p4 = (POINT*)g_luacwrapiface->checktype(L, 4, &regType_POINT.hdr);
 
   retval = 
     SetWindowOrgEx(
@@ -4897,7 +5705,7 @@ int winapi_SetWindowOrgEx( lua_State *L )
       p4
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -4917,7 +5725,7 @@ int winapi_OffsetViewportOrgEx( lua_State *L )
   p1 = lua_toDC(L, 1);
   p2 = lua_tointeger(L, 2);
   p3 = lua_tointeger(L, 3);
-  p4 = (POINT*)luacwrap_checktype(L, 4, &regType_POINT.hdr);
+  p4 = (POINT*)g_luacwrapiface->checktype(L, 4, &regType_POINT.hdr);
 
   retval = 
     OffsetViewportOrgEx(
@@ -4927,7 +5735,7 @@ int winapi_OffsetViewportOrgEx( lua_State *L )
       p4
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -4947,7 +5755,7 @@ int winapi_OffsetWindowOrgEx( lua_State *L )
   p1 = lua_toDC(L, 1);
   p2 = lua_tointeger(L, 2);
   p3 = lua_tointeger(L, 3);
-  p4 = (POINT*)luacwrap_checktype(L, 4, &regType_POINT.hdr);
+  p4 = (POINT*)g_luacwrapiface->checktype(L, 4, &regType_POINT.hdr);
 
   retval = 
     OffsetWindowOrgEx(
@@ -4957,7 +5765,7 @@ int winapi_OffsetWindowOrgEx( lua_State *L )
       p4
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -4981,7 +5789,7 @@ int winapi_ScaleViewportExtEx( lua_State *L )
   p3 = lua_tointeger(L, 3);
   p4 = lua_tointeger(L, 4);
   p5 = lua_tointeger(L, 5);
-  p6 = (SIZE*)luacwrap_checktype(L, 6, &regType_SIZE.hdr);
+  p6 = (SIZE*)g_luacwrapiface->checktype(L, 6, &regType_SIZE.hdr);
 
   retval = 
     ScaleViewportExtEx(
@@ -4993,7 +5801,7 @@ int winapi_ScaleViewportExtEx( lua_State *L )
       p6
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -5017,7 +5825,7 @@ int winapi_ScaleWindowExtEx( lua_State *L )
   p3 = lua_tointeger(L, 3);
   p4 = lua_tointeger(L, 4);
   p5 = lua_tointeger(L, 5);
-  p6 = (SIZE*)luacwrap_checktype(L, 6, &regType_SIZE.hdr);
+  p6 = (SIZE*)g_luacwrapiface->checktype(L, 6, &regType_SIZE.hdr);
 
   retval = 
     ScaleWindowExtEx(
@@ -5029,7 +5837,7 @@ int winapi_ScaleWindowExtEx( lua_State *L )
       p6
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -5055,7 +5863,7 @@ int winapi_CreatePen( lua_State *L )
       p3
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushlightuserdata(L, (PVOID)retval); ++numret;
 
   return numret;
@@ -5067,14 +5875,14 @@ int winapi_CreatePenIndirect( lua_State *L )
   HPEN retval;
   LOGPEN* p1;
 
-  p1 = (LOGPEN*)luacwrap_checktype(L, 1, &regType_LOGPEN.hdr);
+  p1 = (LOGPEN*)g_luacwrapiface->checktype(L, 1, &regType_LOGPEN.hdr);
 
   retval = 
     CreatePenIndirect(
       p1
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushlightuserdata(L, (PVOID)retval); ++numret;
 
   return numret;
@@ -5093,7 +5901,7 @@ int winapi_CreatePatternBrush( lua_State *L )
       p1
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushlightuserdata(L, (PVOID)retval); ++numret;
 
   return numret;
@@ -5112,7 +5920,7 @@ int winapi_CreateSolidBrush( lua_State *L )
       p1
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushlightuserdata(L, (PVOID)retval); ++numret;
 
   return numret;
@@ -5135,7 +5943,7 @@ int winapi_CreateHatchBrush( lua_State *L )
       p2
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushlightuserdata(L, (PVOID)retval); ++numret;
 
   return numret;
@@ -5148,14 +5956,14 @@ int winapi_CreateFontIndirectW( lua_State *L )
   HFONT retval;
   LOGFONTW* p1;
 
-  p1 = (LOGFONTW*)luacwrap_checktype(L, 1, &regType_LOGFONTW.hdr);
+  p1 = (LOGFONTW*)g_luacwrapiface->checktype(L, 1, &regType_LOGFONTW.hdr);
 
   retval = 
     CreateFontIndirectW(
       p1
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushlightuserdata(L, (PVOID)retval); ++numret;
 
   return numret;
@@ -5214,7 +6022,7 @@ int winapi_CreateFontW( lua_State *L )
       p14
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushlightuserdata(L, (PVOID)retval); ++numret;
 
   return numret;
@@ -5239,7 +6047,7 @@ int winapi_GetTextExtentExPointW( lua_State *L )
   p4 = lua_tointeger(L, 4);
   p5 = (LPINT)lua_touserdata(L, 5);
   p6 = (LPINT)lua_touserdata(L, 6);
-  p7 = (SIZE*)luacwrap_checktype(L, 7, &regType_SIZE.hdr);
+  p7 = (SIZE*)g_luacwrapiface->checktype(L, 7, &regType_SIZE.hdr);
 
   retval = 
     GetTextExtentExPointW(
@@ -5252,7 +6060,7 @@ int winapi_GetTextExtentExPointW( lua_State *L )
       p7
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -5270,7 +6078,7 @@ int winapi_GetTextExtentPoint32W( lua_State *L )
   p1 = lua_toDC(L, 1);
   p2 = (LPCWSTR)lua_tostring(L, 2);
   p3 = lua_tointeger(L, 3);
-  p4 = (SIZE*)luacwrap_checktype(L, 4, &regType_SIZE.hdr);
+  p4 = (SIZE*)g_luacwrapiface->checktype(L, 4, &regType_SIZE.hdr);
 
   retval = 
     GetTextExtentPoint32W(
@@ -5280,7 +6088,7 @@ int winapi_GetTextExtentPoint32W( lua_State *L )
       p4
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -5308,7 +6116,7 @@ int winapi_CreateRectRgn( lua_State *L )
       p4
     );
 
-  // marshal retval  
+  // marshal retval
   numret += lua_pushRegion(L, retval);
 
   return numret;
@@ -5320,14 +6128,14 @@ int winapi_CreateRectRgnIndirect( lua_State *L )
   HRGN retval;
   RECT* p1;
 
-  p1 = (RECT*)luacwrap_checktype(L, 1, &regType_RECT.hdr);
+  p1 = (RECT*)g_luacwrapiface->checktype(L, 1, &regType_RECT.hdr);
 
   retval = 
     CreateRectRgnIndirect(
       p1
     );
 
-  // marshal retval  
+  // marshal retval
   numret += lua_pushRegion(L, retval);
 
   return numret;
@@ -5362,7 +6170,7 @@ int winapi_CreateRoundRectRgn( lua_State *L )
       p6
     );
 
-  // marshal retval  
+  // marshal retval
   numret += lua_pushRegion(L, retval);
 
   return numret;
@@ -5392,7 +6200,7 @@ int winapi_CreateEllipticRgn( lua_State *L )
       p4
     );
 
-  // marshal retval  
+  // marshal retval
   numret += lua_pushRegion(L, retval);
 
   return numret;
@@ -5406,14 +6214,14 @@ int winapi_CreateEllipticRgnIndirect( lua_State *L )
   HRGN retval;
   RECT* p1;
 
-  p1 = (RECT*)luacwrap_checktype(L, 1, &regType_RECT.hdr);
+  p1 = (RECT*)g_luacwrapiface->checktype(L, 1, &regType_RECT.hdr);
 
   retval = 
     CreateEllipticRgnIndirect(
       p1
     );
 
-  // marshal retval  
+  // marshal retval
   numret += lua_pushRegion(L, retval);
 
   return numret;
@@ -5436,7 +6244,7 @@ int winapi_EqualRgn( lua_State *L )
       p2
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -5464,7 +6272,7 @@ int winapi_CombineRgn( lua_State *L )
       p4
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -5489,7 +6297,7 @@ int winapi_OffsetRgn( lua_State *L )
       p3
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -5520,7 +6328,7 @@ int winapi_SetRectRgn( lua_State *L )
       p5
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -5545,7 +6353,7 @@ int winapi_PtInRegion( lua_State *L )
       p3
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -5559,7 +6367,7 @@ int winapi_RectInRegion( lua_State *L )
   RECT* p2;
 
   p1 = lua_toRegion(L, 1);
-  p2 = (RECT*)luacwrap_checktype(L, 2, &regType_RECT.hdr);
+  p2 = (RECT*)g_luacwrapiface->checktype(L, 2, &regType_RECT.hdr);
 
   retval = 
     RectInRegion(
@@ -5567,7 +6375,7 @@ int winapi_RectInRegion( lua_State *L )
       p2
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -5587,7 +6395,7 @@ int winapi_BeginPath( lua_State *L )
       p1
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -5608,7 +6416,7 @@ int winapi_CloseFigure( lua_State *L )
       p1
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -5629,7 +6437,7 @@ int winapi_EndPath( lua_State *L )
       p1
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -5650,7 +6458,7 @@ int winapi_FillPath( lua_State *L )
       p1
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -5671,7 +6479,7 @@ int winapi_FlattenPath( lua_State *L )
       p1
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -5692,7 +6500,7 @@ int winapi_PathToRegion( lua_State *L )
       p1
     );
 
-  // marshal retval  
+  // marshal retval
   numret += lua_pushRegion(L, retval);
 
   return numret;
@@ -5713,7 +6521,7 @@ int winapi_StrokeAndFillPath( lua_State *L )
       p1
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -5734,7 +6542,7 @@ int winapi_StrokePath( lua_State *L )
       p1
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -5755,7 +6563,7 @@ int winapi_WidenPath( lua_State *L )
       p1
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -5800,7 +6608,7 @@ int winapi_Arc( lua_State *L )
       p9
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -5845,7 +6653,7 @@ int winapi_ArcTo( lua_State *L )
       p9
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -5890,7 +6698,7 @@ int winapi_Chord( lua_State *L )
       p9
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -5916,7 +6724,7 @@ int winapi_LineTo( lua_State *L )
       p3
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -5936,7 +6744,7 @@ int winapi_MoveToEx( lua_State *L )
   p3 = lua_tointeger(L, 3);
   if (!lua_isnil(L, 4))
   {
-    p4 = (POINT*)luacwrap_checktype(L, 4, &regType_POINT.hdr);
+    p4 = (POINT*)g_luacwrapiface->checktype(L, 4, &regType_POINT.hdr);
   }
 
   retval = 
@@ -5947,7 +6755,7 @@ int winapi_MoveToEx( lua_State *L )
       p4
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -5978,7 +6786,7 @@ int winapi_Ellipse( lua_State *L )
       p5
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -6022,7 +6830,7 @@ int winapi_Pie( lua_State *L )
       p9
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -6054,7 +6862,7 @@ int winapi_Rectangle( lua_State *L )
       p5
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -6091,7 +6899,7 @@ int winapi_RoundRect( lua_State *L )
       p7
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -6123,7 +6931,7 @@ int winapi_ExtFloodFill( lua_State *L )
       p5
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -6149,7 +6957,7 @@ int winapi_FillRgn( lua_State *L )
       p3
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -6178,7 +6986,7 @@ int winapi_FloodFill( lua_State *L )
       p4
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -6222,7 +7030,7 @@ int winapi_BitBlt( lua_State *L )
       p9
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -6256,7 +7064,7 @@ int winapi_PatBlt( lua_State *L )
       p6
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -6305,7 +7113,7 @@ int winapi_StretchBlt( lua_State *L )
       p11
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -6355,7 +7163,7 @@ int winapi_TransparentBlt( lua_State *L )
       p11
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -6388,7 +7196,7 @@ int winapi_TextOutW( lua_State *L )
       p5
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -6412,7 +7220,7 @@ int winapi_ExtTextOutW( lua_State *L )
   p2 = lua_tointeger(L, 2);
   p3 = lua_tointeger(L, 3);
   p4 = (UINT)lua_tonumber(L, 4);
-  p5 = (RECT*)luacwrap_checktype(L, 5, &regType_RECT.hdr);
+  p5 = (RECT*)g_luacwrapiface->checktype(L, 5, &regType_RECT.hdr);
   p6 = (LPCWSTR)lua_tostring(L, 6);
   p7 = (UINT)lua_tonumber(L, 7);
   p8 = lua_tointeger(L, 8);
@@ -6429,8 +7237,10 @@ int winapi_ExtTextOutW( lua_State *L )
       &p8
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
+
+  // TODO: marshal INT
 
   return numret;
 }
@@ -6455,7 +7265,7 @@ int winapi_wglCopyContext( lua_State *L )
       p3
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -6476,7 +7286,7 @@ int winapi_wglCreateContext( lua_State *L )
       p1
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushlightuserdata(L, (PVOID)retval); ++numret;
 
   return numret;
@@ -6500,7 +7310,7 @@ int winapi_wglCreateLayerContext( lua_State *L )
       p2
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushlightuserdata(L, (PVOID)retval); ++numret;
 
   return numret;
@@ -6521,7 +7331,7 @@ int winapi_wglDeleteContext( lua_State *L )
       p1
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -6539,7 +7349,7 @@ int winapi_wglGetCurrentContext( lua_State *L )
     wglGetCurrentContext(
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushlightuserdata(L, (PVOID)retval); ++numret;
 
   return numret;
@@ -6557,7 +7367,7 @@ int winapi_wglGetCurrentDC( lua_State *L )
     wglGetCurrentDC(
     );
 
-  // marshal retval  
+  // marshal retval
   numret += lua_pushDC(L, retval);
 
   return numret;
@@ -6581,7 +7391,7 @@ int winapi_wglMakeCurrent( lua_State *L )
       p2
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -6605,7 +7415,7 @@ int winapi_wglShareLists( lua_State *L )
       p2
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -6635,7 +7445,7 @@ int winapi_wglUseFontBitmapsA( lua_State *L )
       p4
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -6665,7 +7475,7 @@ int winapi_wglUseFontBitmapsW( lua_State *L )
       p4
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -6686,7 +7496,7 @@ int winapi_SwapBuffers( lua_State *L )
       p1
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -6713,7 +7523,7 @@ int winapi_wglRealizeLayerPalette( lua_State *L )
       p3
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -6737,7 +7547,7 @@ int winapi_wglSwapLayerBuffers( lua_State *L )
       p2
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -6751,6 +7561,25 @@ int winapi_InitCommonControls( lua_State *L )
 
     InitCommonControls(
     );
+
+  return numret;
+}
+
+int winapi_InitCommonControlsEx( lua_State *L )
+{
+  int numret = 0;
+  BOOL retval;
+  INITCOMMONCONTROLSEX* p1;
+
+  p1 = (INITCOMMONCONTROLSEX*)g_luacwrapiface->checktype(L, 1, &regType_INITCOMMONCONTROLSEX.hdr);
+
+  retval = 
+    InitCommonControlsEx(
+      p1
+    );
+
+  // marshal retval
+  lua_pushinteger(L, retval); ++numret;
 
   return numret;
 }
@@ -6790,7 +7619,7 @@ int winapi_ImageList_LoadImageW( lua_State *L )
       p7
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushlightuserdata(L, (PVOID)retval); ++numret;
 
   return numret;
@@ -6816,7 +7645,7 @@ int winapi_ImageList_AddMasked( lua_State *L )
       p3
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -6828,14 +7657,14 @@ int winapi_GetOpenFileNameW( lua_State *L )
   BOOL retval;
   OPENFILENAMEW* p1;
 
-  p1 = (OPENFILENAMEW*)luacwrap_checktype(L, 1, &regType_OPENFILENAMEW.hdr);
+  p1 = (OPENFILENAMEW*)g_luacwrapiface->checktype(L, 1, &regType_OPENFILENAMEW.hdr);
 
   retval = 
     GetOpenFileNameW(
       p1
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -6847,14 +7676,14 @@ int winapi_GetSaveFileNameW( lua_State *L )
   BOOL retval;
   OPENFILENAMEW* p1;
 
-  p1 = (OPENFILENAMEW*)luacwrap_checktype(L, 1, &regType_OPENFILENAMEW.hdr);
+  p1 = (OPENFILENAMEW*)g_luacwrapiface->checktype(L, 1, &regType_OPENFILENAMEW.hdr);
 
   retval = 
     GetSaveFileNameW(
       p1
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -6866,14 +7695,14 @@ int winapi_ChooseColor( lua_State *L )
   BOOL retval;
   CHOOSECOLOR* p1;
 
-  p1 = (CHOOSECOLOR*)luacwrap_checktype(L, 1, &regType_CHOOSECOLOR.hdr);
+  p1 = (CHOOSECOLOR*)g_luacwrapiface->checktype(L, 1, &regType_CHOOSECOLOR.hdr);
 
   retval = 
     ChooseColor(
       p1
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -6889,7 +7718,7 @@ int winapi_CommDlgExtendedError( lua_State *L )
     CommDlgExtendedError(
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushnumber(L, retval); ++numret;
 
   return numret;
@@ -6902,14 +7731,14 @@ int winapi_PrintDlgW( lua_State *L )
   BOOL retval;
   PRINTDLGW* p1;
 
-  p1 = (PRINTDLGW*)luacwrap_checktype(L, 1, &regType_PRINTDLGW.hdr);
+  p1 = (PRINTDLGW*)g_luacwrapiface->checktype(L, 1, &regType_PRINTDLGW.hdr);
 
   retval = 
     PrintDlgW(
       p1
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -6959,7 +7788,7 @@ int winapi_RequestPowerNotifications( lua_State *L )
       p2
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushlightuserdata(L, (PVOID)retval); ++numret;
 
   return numret;
@@ -6980,7 +7809,7 @@ int winapi_StopPowerNotifications( lua_State *L )
       p1
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushnumber(L, retval); ++numret;
 
   return numret;
@@ -6996,7 +7825,7 @@ int winapi_CreateMsgQueue( lua_State *L )
   MSGQUEUEOPTIONS* p2;
 
   p1 = (LPCWSTR)lua_tostring(L, 1);
-  p2 = (MSGQUEUEOPTIONS*)luacwrap_checktype(L, 2, &regType_MSGQUEUEOPTIONS.hdr);
+  p2 = (MSGQUEUEOPTIONS*)g_luacwrapiface->checktype(L, 2, &regType_MSGQUEUEOPTIONS.hdr);
 
   retval = 
     CreateMsgQueue(
@@ -7004,7 +7833,7 @@ int winapi_CreateMsgQueue( lua_State *L )
       p2
     );
 
-  // marshal retval  
+  // marshal retval
   numret += lua_pushMsgQueue(L, retval);
 
   return numret;
@@ -7022,7 +7851,7 @@ int winapi_OpenMsgQueue( lua_State *L )
 
   p1 = (HANDLE)lua_tohandle(L, 1);
   p2 = lua_toMsgQueue(L, 2);
-  p3 = (MSGQUEUEOPTIONS*)luacwrap_checktype(L, 3, &regType_MSGQUEUEOPTIONS.hdr);
+  p3 = (MSGQUEUEOPTIONS*)g_luacwrapiface->checktype(L, 3, &regType_MSGQUEUEOPTIONS.hdr);
 
   retval = 
     OpenMsgQueue(
@@ -7031,7 +7860,7 @@ int winapi_OpenMsgQueue( lua_State *L )
       p3
     );
 
-  // marshal retval  
+  // marshal retval
   numret += lua_pushMsgQueue(L, retval);
 
   return numret;
@@ -7067,8 +7896,12 @@ int winapi_ReadMsgQueue( lua_State *L )
       &p6
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
+
+  // TODO: marshal DWORD
+
+  // TODO: marshal DWORD
 
   return numret;
 }
@@ -7100,7 +7933,7 @@ int winapi_WriteMsgQueue( lua_State *L )
       p5
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -7116,7 +7949,7 @@ int winapi_GetMsgQueueInfo( lua_State *L )
   MSGQUEUEINFO* p2;
 
   p1 = lua_toMsgQueue(L, 1);
-  p2 = (MSGQUEUEINFO*)luacwrap_checktype(L, 2, &regType_MSGQUEUEINFO.hdr);
+  p2 = (MSGQUEUEINFO*)g_luacwrapiface->checktype(L, 2, &regType_MSGQUEUEINFO.hdr);
 
   retval = 
     GetMsgQueueInfo(
@@ -7124,7 +7957,7 @@ int winapi_GetMsgQueueInfo( lua_State *L )
       p2
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -7145,7 +7978,7 @@ int winapi_CloseMsgQueue( lua_State *L )
       p1
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -7163,7 +7996,7 @@ int winapi_SHInitExtraControls( lua_State *L )
     SHInitExtraControls(
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -7177,14 +8010,14 @@ int winapi_SHInitDialog( lua_State *L )
   BOOL retval;
   SHINITDLGINFO* p1;
 
-  p1 = (SHINITDLGINFO*)luacwrap_checktype(L, 1, &regType_SHINITDLGINFO.hdr);
+  p1 = (SHINITDLGINFO*)g_luacwrapiface->checktype(L, 1, &regType_SHINITDLGINFO.hdr);
 
   retval = 
     SHInitDialog(
       p1
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -7198,14 +8031,14 @@ int winapi_SHCreateMenuBar( lua_State *L )
   BOOL retval;
   SHMENUBARINFO* p1;
 
-  p1 = (SHMENUBARINFO*)luacwrap_checktype(L, 1, &regType_SHMENUBARINFO.hdr);
+  p1 = (SHMENUBARINFO*)g_luacwrapiface->checktype(L, 1, &regType_SHMENUBARINFO.hdr);
 
   retval = 
     SHCreateMenuBar(
       p1
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -7226,7 +8059,7 @@ int winapi_SHFindMenuBar( lua_State *L )
       p1
     );
 
-  // marshal retval  
+  // marshal retval
   numret += lua_pushWindow(L, retval);
 
   return numret;
@@ -7247,7 +8080,7 @@ int winapi_SHHandleWMActivate( lua_State *L )
   p1 = lua_toWindow(L, 1);
   p2 = (WPARAM)lua_tolwparam(L, 2);
   p3 = (LPARAM)lua_tolwparam(L, 3);
-  p4 = (SHACTIVATEINFO*)luacwrap_checktype(L, 4, &regType_SHACTIVATEINFO.hdr);
+  p4 = (SHACTIVATEINFO*)g_luacwrapiface->checktype(L, 4, &regType_SHACTIVATEINFO.hdr);
   p5 = (DWORD)lua_tonumber(L, 5);
 
   retval = 
@@ -7259,7 +8092,7 @@ int winapi_SHHandleWMActivate( lua_State *L )
       p5
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -7279,7 +8112,7 @@ int winapi_SHHandleWMSettingChange( lua_State *L )
   p1 = lua_toWindow(L, 1);
   p2 = (WPARAM)lua_tolwparam(L, 2);
   p3 = (LPARAM)lua_tolwparam(L, 3);
-  p4 = (SHACTIVATEINFO*)luacwrap_checktype(L, 4, &regType_SHACTIVATEINFO.hdr);
+  p4 = (SHACTIVATEINFO*)g_luacwrapiface->checktype(L, 4, &regType_SHACTIVATEINFO.hdr);
 
   retval = 
     SHHandleWMSettingChange(
@@ -7289,7 +8122,7 @@ int winapi_SHHandleWMSettingChange( lua_State *L )
       p4
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -7313,7 +8146,7 @@ int winapi_SHFullScreen( lua_State *L )
       p2
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -7337,7 +8170,7 @@ int winapi_SHDoneButton( lua_State *L )
       p2
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -7361,7 +8194,7 @@ int winapi_SHSetAppKeyWndAssoc( lua_State *L )
       p2
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -7388,7 +8221,7 @@ int winapi_CommandBar_Create( lua_State *L )
       p3
     );
 
-  // marshal retval  
+  // marshal retval
   numret += lua_pushWindow(L, retval);
 
   return numret;
@@ -7412,7 +8245,7 @@ int winapi_CommandBar_Show( lua_State *L )
       p2
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -7448,7 +8281,7 @@ int winapi_CommandBar_AddBitmap( lua_State *L )
       p6
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -7484,7 +8317,7 @@ int winapi_CommandBar_InsertComboBox( lua_State *L )
       p6
     );
 
-  // marshal retval  
+  // marshal retval
   numret += lua_pushWindow(L, retval);
 
   return numret;
@@ -7514,7 +8347,7 @@ int winapi_CommandBar_InsertMenubar( lua_State *L )
       p4
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -7544,7 +8377,7 @@ int winapi_CommandBar_InsertMenubarEx( lua_State *L )
       p4
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -7568,7 +8401,7 @@ int winapi_CommandBar_DrawMenuBar( lua_State *L )
       p2
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -7592,7 +8425,7 @@ int winapi_CommandBar_GetMenu( lua_State *L )
       p2
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushlightuserdata(L, (PVOID)retval); ++numret;
 
   return numret;
@@ -7619,7 +8452,7 @@ int winapi_CommandBar_AddAdornments( lua_State *L )
       p3
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -7640,7 +8473,7 @@ int winapi_CommandBar_AlignAdornments( lua_State *L )
       p1
     );
 
-  // marshal retval  
+  // marshal retval
   
 
   return numret;
@@ -7661,7 +8494,7 @@ int winapi_CommandBar_Height( lua_State *L )
       p1
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -7677,7 +8510,7 @@ int winapi_IsCommandBarMessage( lua_State *L )
   MSG* p2;
 
   p1 = lua_toWindow(L, 1);
-  p2 = (MSG*)luacwrap_checktype(L, 2, &regType_MSG.hdr);
+  p2 = (MSG*)g_luacwrapiface->checktype(L, 2, &regType_MSG.hdr);
 
   retval = 
     IsCommandBarMessage(
@@ -7685,7 +8518,7 @@ int winapi_IsCommandBarMessage( lua_State *L )
       p2
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushinteger(L, retval); ++numret;
 
   return numret;
@@ -7700,7 +8533,7 @@ int winapi_ConnMgrEstablishConnection( lua_State *L )
   CONNMGR_CONNECTIONINFO* p1;
   HANDLE p2;
 
-  p1 = (CONNMGR_CONNECTIONINFO*)luacwrap_checktype(L, 1, &regType_CONNMGR_CONNECTIONINFO.hdr);
+  p1 = (CONNMGR_CONNECTIONINFO*)g_luacwrapiface->checktype(L, 1, &regType_CONNMGR_CONNECTIONINFO.hdr);
   p2 = (HANDLE)lua_tohandle(L, 2);
 
   retval = 
@@ -7709,8 +8542,10 @@ int winapi_ConnMgrEstablishConnection( lua_State *L )
       &p2
     );
 
-  // marshal retval  
+  // marshal retval
   
+
+  // TODO: marshal HANDLE
 
   return numret;
 }
@@ -7726,7 +8561,7 @@ int winapi_ConnMgrEstablishConnectionSync( lua_State *L )
   DWORD p3;
   DWORD p4;
 
-  p1 = (CONNMGR_CONNECTIONINFO*)luacwrap_checktype(L, 1, &regType_CONNMGR_CONNECTIONINFO.hdr);
+  p1 = (CONNMGR_CONNECTIONINFO*)g_luacwrapiface->checktype(L, 1, &regType_CONNMGR_CONNECTIONINFO.hdr);
   p2 = (HANDLE)lua_tohandle(L, 2);
   p3 = (DWORD)lua_tonumber(L, 3);
   p4 = (DWORD)lua_tonumber(L, 4);
@@ -7739,8 +8574,12 @@ int winapi_ConnMgrEstablishConnectionSync( lua_State *L )
       &p4
     );
 
-  // marshal retval  
+  // marshal retval
   
+
+  // TODO: marshal HANDLE
+
+  // TODO: marshal DWORD
 
   return numret;
 }
@@ -7763,8 +8602,10 @@ int winapi_ConnMgrConnectionStatus( lua_State *L )
       &p2
     );
 
-  // marshal retval  
+  // marshal retval
   
+
+  // TODO: marshal DWORD
 
   return numret;
 }
@@ -7787,7 +8628,7 @@ int winapi_ConnMgrReleaseConnection( lua_State *L )
       p2
     );
 
-  // marshal retval  
+  // marshal retval
   
 
   return numret;
@@ -7811,7 +8652,7 @@ int winapi_ConnMgrSetConnectionPriority( lua_State *L )
       p2
     );
 
-  // marshal retval  
+  // marshal retval
   
 
   return numret;
@@ -7828,7 +8669,7 @@ int winapi_ConnMgrMapURL( lua_State *L )
   DWORD p3;
 
   p1 = (LPCWSTR)lua_tostring(L, 1);
-  p2 = (GUID*)luacwrap_checktype(L, 2, &regType_GUID.hdr);
+  p2 = (GUID*)g_luacwrapiface->checktype(L, 2, &regType_GUID.hdr);
   p3 = (DWORD)lua_tonumber(L, 3);
 
   retval = 
@@ -7838,8 +8679,10 @@ int winapi_ConnMgrMapURL( lua_State *L )
       &p3
     );
 
-  // marshal retval  
+  // marshal retval
   
+
+  // TODO: marshal DWORD
 
   return numret;
 }
@@ -7856,7 +8699,7 @@ int winapi_ConnMgrApiReadyEvent( lua_State *L )
     ConnMgrApiReadyEvent(
     );
 
-  // marshal retval  
+  // marshal retval
   lua_pushlightuserdata(L, (PVOID)retval); ++numret;
 
   return numret;
@@ -7864,11 +8707,9 @@ int winapi_ConnMgrApiReadyEvent( lua_State *L )
 
 #endif
 
-static const luaL_reg module_lib[ ] = {
-  { "version"           , luawrap_version },
-//  { "unittestPrepare"   , luawrap_unittestPrepare },
-//  { "unittestPrintStructA"   , luawrap_unittestPrintStructA },
-
+static const luaL_Reg module_lib[ ] = {
+  { "GetDefDlgProcW"    , winapi_GetDefDlgProcW  },
+  { "GetDefWindowProcW" , winapi_GetDefWindowProcW },
   { "ProcessMessages"   , winapi_ProcessMessages },
 
   { "GetLastError",  winapi_GetLastError },
@@ -7972,6 +8813,11 @@ static const luaL_reg module_lib[ ] = {
   { "SetForegroundWindow",  winapi_SetForegroundWindow },
   { "SetFocus",  winapi_SetFocus },
   { "GetFocus",  winapi_GetFocus },
+  { "SwapMouseButton",  winapi_SwapMouseButton },
+  { "GetMessagePos",  winapi_GetMessagePos },
+  { "GetMessageTime",  winapi_GetMessageTime },
+  { "GetMessageExtraInfo",  winapi_GetMessageExtraInfo },
+  { "SetMessageExtraInfo",  winapi_SetMessageExtraInfo },
   { "GetMessageW",  winapi_GetMessageW },
   { "PostMessageW",  winapi_PostMessageW },
   { "PostThreadMessageW",  winapi_PostThreadMessageW },
@@ -8054,6 +8900,25 @@ static const luaL_reg module_lib[ ] = {
   { "LoadImageW",  winapi_LoadImageW },
   { "LoadCursorW",  winapi_LoadCursorW },
   { "SetCursor",  winapi_SetCursor },
+  { "CreateDialogParamW",  winapi_CreateDialogParamW },
+  { "CreateDialogIndirectParamW",  winapi_CreateDialogIndirectParamW },
+  { "DialogBoxParamW",  winapi_DialogBoxParamW },
+  { "DialogBoxIndirectParamW",  winapi_DialogBoxIndirectParamW },
+  { "EndDialog",  winapi_EndDialog },
+  { "GetDlgItem",  winapi_GetDlgItem },
+  { "SetDlgItemInt",  winapi_SetDlgItemInt },
+  { "GetDlgItemInt",  winapi_GetDlgItemInt },
+  { "SetDlgItemTextW",  winapi_SetDlgItemTextW },
+  { "GetDlgItemTextW",  winapi_GetDlgItemTextW },
+  { "CheckDlgButton",  winapi_CheckDlgButton },
+  { "CheckRadioButton",  winapi_CheckRadioButton },
+  { "IsDlgButtonChecked",  winapi_IsDlgButtonChecked },
+  { "SendDlgItemMessageW",  winapi_SendDlgItemMessageW },
+  { "GetNextDlgGroupItem",  winapi_GetNextDlgGroupItem },
+  { "GetNextDlgTabItem",  winapi_GetNextDlgTabItem },
+  { "GetDlgCtrlID",  winapi_GetDlgCtrlID },
+  { "GetDialogBaseUnits",  winapi_GetDialogBaseUnits },
+  { "DefDlgProcW",  winapi_DefDlgProcW },
   { "DeleteObject",  winapi_DeleteObject },
   { "GetObjectW",  winapi_GetObjectW },
   { "GetObjectType",  winapi_GetObjectType },
@@ -8259,6 +9124,7 @@ static const luaL_reg module_lib[ ] = {
   { "wglSwapLayerBuffers",  winapi_wglSwapLayerBuffers },
 #endif
   { "InitCommonControls",  winapi_InitCommonControls },
+  { "InitCommonControlsEx",  winapi_InitCommonControlsEx },
 #if (!defined(UNDER_CE))
   { "ImageList_LoadImageW",  winapi_ImageList_LoadImageW },
 #endif
@@ -8383,6 +9249,7 @@ static const luaL_reg module_lib[ ] = {
   { NULL, NULL }
 };
 
+
 //////////////////////////////////////////////////////////////////////////
 /**
 
@@ -8397,98 +9264,112 @@ int register_winapi(lua_State *L)
   int M = lua_gettop(L);
 
   // register package functions
-  luaL_register( L, NULL, module_lib );
+#if (LUA_VERSION_NUM > 501)
+  luaL_setfuncs(L, module_lib, 0);
+#else
+  luaL_openlib(L, NULL, module_lib, 0);
+#endif
 
   // register array types
-  luacwrap_registertype(L, M, &regType_UINT8_32.hdr);
-  luacwrap_registertype(L, M, &regType_UINT16_128.hdr);
-  luacwrap_registertype(L, M, &regType_UINT16_32.hdr);
-  luacwrap_registertype(L, M, &regType_UINT8_8.hdr);
+  g_luacwrapiface->registertype(L, M, &regType_UINT8_8.hdr);
+  g_luacwrapiface->registertype(L, M, &regType_UINT16_80.hdr);
+  g_luacwrapiface->registertype(L, M, &regType_UINT16_128.hdr);
+  g_luacwrapiface->registertype(L, M, &regType_UINT8_32.hdr);
+  g_luacwrapiface->registertype(L, M, &regType_UINT16_32.hdr);
   
   // register structure types
-  luacwrap_registertype(L, M, &regType_GUID.hdr);
+  g_luacwrapiface->registertype(L, M, &regType_GUID.hdr);
 #if (defined(UNDER_CE))
-  luacwrap_registertype(L, M, &regType_MSGQUEUEINFO.hdr);
+  g_luacwrapiface->registertype(L, M, &regType_MSGQUEUEINFO.hdr);
 #endif
-  luacwrap_registertype(L, M, &regType_TVITEMW.hdr);
+  g_luacwrapiface->registertype(L, M, &regType_TVITEMW.hdr);
 #if (!defined(UNDER_CE))
-  luacwrap_registertype(L, M, &regType_LVGROUPMETRICS.hdr);
+  g_luacwrapiface->registertype(L, M, &regType_LVGROUPMETRICS.hdr);
 #endif
-  luacwrap_registertype(L, M, &regType_PROCESS_INFORMATION.hdr);
-  luacwrap_registertype(L, M, &regType_LVCOLUMNW.hdr);
+  g_luacwrapiface->registertype(L, M, &regType_HDITEMW.hdr);
+  g_luacwrapiface->registertype(L, M, &regType_LVCOLUMNW.hdr);
 #if (defined(USE_AYGSHELL))
-  luacwrap_registertype(L, M, &regType_SHINITDLGINFO.hdr);
+  g_luacwrapiface->registertype(L, M, &regType_SHINITDLGINFO.hdr);
 #endif
-  luacwrap_registertype(L, M, &regType_LOGPEN.hdr);
-  luacwrap_registertype(L, M, &regType_SECURITY_ATTRIBUTES.hdr);
-  luacwrap_registertype(L, M, &regType_LOGFONTW.hdr);
-#if (defined(UNDER_CE))
-  luacwrap_registertype(L, M, &regType_POWER_BROADCAST.hdr);
-#endif
-#if (!defined(UNDER_CE))
-  luacwrap_registertype(L, M, &regType_NMTCKEYDOWN.hdr);
-#endif
-  luacwrap_registertype(L, M, &regType_STARTUPINFOW.hdr);
-  luacwrap_registertype(L, M, &regType_POINTS.hdr);
-  luacwrap_registertype(L, M, &regType_RECT.hdr);
-#if (defined(USE_AYGSHELL))
-  luacwrap_registertype(L, M, &regType_SHMENUBARINFO.hdr);
-#endif
-  luacwrap_registertype(L, M, &regType_OSVERSIONINFOW.hdr);
-  luacwrap_registertype(L, M, &regType_OPENFILENAMEW.hdr);
-  luacwrap_registertype(L, M, &regType_TCITEMHEADERW.hdr);
-  luacwrap_registertype(L, M, &regType_MENUITEMINFOW.hdr);
-  luacwrap_registertype(L, M, &regType_CHOOSECOLOR.hdr);
+  g_luacwrapiface->registertype(L, M, &regType_NMLVKEYDOWN.hdr);
+  g_luacwrapiface->registertype(L, M, &regType_LOGPEN.hdr);
+  g_luacwrapiface->registertype(L, M, &regType_SECURITY_ATTRIBUTES.hdr);
 #if (defined(USE_COMMANDBAR))
-  luacwrap_registertype(L, M, &regType_COMMANDBANDSRESTOREINFO.hdr);
+  g_luacwrapiface->registertype(L, M, &regType_COMMANDBANDSRESTOREINFO.hdr);
+#endif
+  g_luacwrapiface->registertype(L, M, &regType_LOGFONTW.hdr);
+#if (defined(UNDER_CE))
+  g_luacwrapiface->registertype(L, M, &regType_POWER_BROADCAST.hdr);
+#endif
+#if (!defined(UNDER_CE))
+  g_luacwrapiface->registertype(L, M, &regType_NMTCKEYDOWN.hdr);
+#endif
+  g_luacwrapiface->registertype(L, M, &regType_STARTUPINFOW.hdr);
+  g_luacwrapiface->registertype(L, M, &regType_POINTS.hdr);
+#if (defined(USE_AYGSHELL))
+  g_luacwrapiface->registertype(L, M, &regType_SHACTIVATEINFO.hdr);
+#endif
+  g_luacwrapiface->registertype(L, M, &regType_PROCESS_INFORMATION.hdr);
+#if (defined(UNDER_CE))
+  g_luacwrapiface->registertype(L, M, &regType_MSGQUEUEOPTIONS.hdr);
+#endif
+  g_luacwrapiface->registertype(L, M, &regType_RECT.hdr);
+#if (!defined(UNDER_CE))
+  g_luacwrapiface->registertype(L, M, &regType_PRINTDLGW.hdr);
+#endif
+#if (!defined(UNDER_CE))
+  g_luacwrapiface->registertype(L, M, &regType_WNDCLASSEXW.hdr);
 #endif
 #if (defined(USE_AYGSHELL))
-  luacwrap_registertype(L, M, &regType_SHACTIVATEINFO.hdr);
+  g_luacwrapiface->registertype(L, M, &regType_SHMENUBARINFO.hdr);
 #endif
+  g_luacwrapiface->registertype(L, M, &regType_OSVERSIONINFOW.hdr);
+  g_luacwrapiface->registertype(L, M, &regType_SIZE.hdr);
+  g_luacwrapiface->registertype(L, M, &regType_TTHITTESTINFOW.hdr);
+  g_luacwrapiface->registertype(L, M, &regType_OPENFILENAMEW.hdr);
+  g_luacwrapiface->registertype(L, M, &regType_TCHITTESTINFO.hdr);
+  g_luacwrapiface->registertype(L, M, &regType_MENUITEMINFOW.hdr);
+  g_luacwrapiface->registertype(L, M, &regType_CHOOSECOLOR.hdr);
+  g_luacwrapiface->registertype(L, M, &regType_TCITEMHEADERW.hdr);
+  g_luacwrapiface->registertype(L, M, &regType_TVINSERTSTRUCTW.hdr);
+  g_luacwrapiface->registertype(L, M, &regType_TVHITTESTINFO.hdr);
+  g_luacwrapiface->registertype(L, M, &regType_NMHDR.hdr);
+  g_luacwrapiface->registertype(L, M, &regType_CREATESTRUCTW.hdr);
+  g_luacwrapiface->registertype(L, M, &regType_HDHITTESTINFO.hdr);
+#if (!defined(UNDER_CE))
+  g_luacwrapiface->registertype(L, M, &regType_NMITEMACTIVATE.hdr);
+#endif
+  g_luacwrapiface->registertype(L, M, &regType_COPYDATASTRUCT.hdr);
+  g_luacwrapiface->registertype(L, M, &regType_TBBUTTONINFOW.hdr);
+#if (!defined(UNDER_CE))
+  g_luacwrapiface->registertype(L, M, &regType_LVGROUP.hdr);
+#endif
+  g_luacwrapiface->registertype(L, M, &regType_ACCEL.hdr);
 #if (defined(UNDER_CE))
-  luacwrap_registertype(L, M, &regType_MSGQUEUEOPTIONS.hdr);
+  g_luacwrapiface->registertype(L, M, &regType_CONNMGR_CONNECTIONINFO.hdr);
 #endif
-  luacwrap_registertype(L, M, &regType_NMHDR.hdr);
+  g_luacwrapiface->registertype(L, M, &regType_POINT.hdr);
+  g_luacwrapiface->registertype(L, M, &regType_NMLISTVIEW.hdr);
+  g_luacwrapiface->registertype(L, M, &regType_NMLVDISPINFOW.hdr);
+  g_luacwrapiface->registertype(L, M, &regType_DLGTEMPLATE.hdr);
+  g_luacwrapiface->registertype(L, M, &regType_PAINTSTRUCT.hdr);
+  g_luacwrapiface->registertype(L, M, &regType_TPMPARAMS.hdr);
+  g_luacwrapiface->registertype(L, M, &regType_LVITEMW.hdr);
+  g_luacwrapiface->registertype(L, M, &regType_NMTTDISPINFOW.hdr);
+  g_luacwrapiface->registertype(L, M, &regType_NMHDDISPINFOW.hdr);
+  g_luacwrapiface->registertype(L, M, &regType_NMHEADERW.hdr);
+  g_luacwrapiface->registertype(L, M, &regType_DLGITEMTEMPLATE.hdr);
+  g_luacwrapiface->registertype(L, M, &regType_NMTREEVIEWW.hdr);
 #if (!defined(UNDER_CE))
-  luacwrap_registertype(L, M, &regType_PRINTDLGW.hdr);
+  g_luacwrapiface->registertype(L, M, &regType_WINDOWPLACEMENT.hdr);
 #endif
-  luacwrap_registertype(L, M, &regType_TCHITTESTINFO.hdr);
+  g_luacwrapiface->registertype(L, M, &regType_TTTOOLINFOW.hdr);
+  g_luacwrapiface->registertype(L, M, &regType_MSG.hdr);
+  g_luacwrapiface->registertype(L, M, &regType_TCITEMW.hdr);
+  g_luacwrapiface->registertype(L, M, &regType_INITCOMMONCONTROLSEX.hdr);
+  g_luacwrapiface->registertype(L, M, &regType_WNDCLASSW.hdr);
 #if (!defined(UNDER_CE))
-  luacwrap_registertype(L, M, &regType_NMITEMACTIVATE.hdr);
-#endif
-  luacwrap_registertype(L, M, &regType_COPYDATASTRUCT.hdr);
-  luacwrap_registertype(L, M, &regType_TBBUTTONINFOW.hdr);
-#if (!defined(UNDER_CE))
-  luacwrap_registertype(L, M, &regType_WNDCLASSEXW.hdr);
-#endif
-  luacwrap_registertype(L, M, &regType_ACCEL.hdr);
-#if (defined(UNDER_CE))
-  luacwrap_registertype(L, M, &regType_CONNMGR_CONNECTIONINFO.hdr);
-#endif
-  luacwrap_registertype(L, M, &regType_POINT.hdr);
-  luacwrap_registertype(L, M, &regType_CREATESTRUCTW.hdr);
-  luacwrap_registertype(L, M, &regType_TVINSERTSTRUCTW.hdr);
-  luacwrap_registertype(L, M, &regType_DLGTEMPLATE.hdr);
-  luacwrap_registertype(L, M, &regType_PAINTSTRUCT.hdr);
-  luacwrap_registertype(L, M, &regType_TPMPARAMS.hdr);
-  luacwrap_registertype(L, M, &regType_SIZE.hdr);
-#if (!defined(UNDER_CE))
-  luacwrap_registertype(L, M, &regType_LVGROUP.hdr);
-#endif
-  luacwrap_registertype(L, M, &regType_NMLVKEYDOWN.hdr);
-  luacwrap_registertype(L, M, &regType_NMLISTVIEW.hdr);
-  luacwrap_registertype(L, M, &regType_DLGITEMTEMPLATE.hdr);
-  luacwrap_registertype(L, M, &regType_NMTREEVIEWW.hdr);
-#if (!defined(UNDER_CE))
-  luacwrap_registertype(L, M, &regType_WINDOWPLACEMENT.hdr);
-#endif
-  luacwrap_registertype(L, M, &regType_NMLVDISPINFOW.hdr);
-  luacwrap_registertype(L, M, &regType_MSG.hdr);
-  luacwrap_registertype(L, M, &regType_TCITEMW.hdr);
-  luacwrap_registertype(L, M, &regType_LVITEMW.hdr);
-  luacwrap_registertype(L, M, &regType_WNDCLASSW.hdr);
-#if (!defined(UNDER_CE))
-  luacwrap_registertype(L, M, &regType_OSVERSIONINFOEXW.hdr);
+  g_luacwrapiface->registertype(L, M, &regType_OSVERSIONINFOEXW.hdr);
 #endif
 
   winapi_RegisterWndProc(L);

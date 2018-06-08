@@ -5,15 +5,13 @@
   LICENSE file
 
   Generator for winapi bindings
-  
+
 --]==]
 
 require("templateengine")
 
 dofile("parse.lua")
 
-libname     = "winapi"
-libversion  = "1.0"
 
 -- basic type IDs
 basic_types = {
@@ -35,6 +33,7 @@ basic_types = {
   ["HANDLE_OR_UINT"] = "$ptr",
 
   ["WNDPROC"]    = "$ptr",
+  ["DLGPROC"]    = "$ptr",
 
   ["WPARAM"]     = "$u32",
   ["LPARAM"]     = "$u32",
@@ -159,6 +158,11 @@ marshall_fragments =
     ["in"]  = "$name = ($type)lua_tonumber(L, $index);",
     ["out"] = "lua_pushnumber(L, $name); ++numret;"
   },
+  ["INT_PTR"] = {
+
+    ["in"]  = "$name = ($type)lua_tonumber(L, $index);",
+    ["out"] = "lua_pushnumber(L, $name); ++numret;"
+  },
   ["DOUBLE"] = {
 
     ["in"]  = "$name = lua_tonumber(L, $index);",
@@ -185,7 +189,11 @@ marshall_fragments =
   },
   ["WNDPROC"] = {
 
-    ["declare"] = "WNDPROC $name$defval;",
+    ["in"]  = "$name = ($type)lua_tohandle(L, $index);",
+    ["out"] = "lua_pushlightuserdata(L, $name); ++numret;"
+  },
+  ["DLGPROC"] = {
+
     ["in"]  = "$name = ($type)lua_tohandle(L, $index);",
     ["out"] = "lua_pushlightuserdata(L, $name); ++numret;"
   },
@@ -198,6 +206,12 @@ marshall_fragments =
 
     ["in"]  = "$name = ($type)lua_tostring(L, $index);",
     ["out"] = "lua_pushwstring(L, $name); ++numret;"
+  },
+  ["LPCWSTR_OR_ATOM"] = {
+
+    ["declare"] = "LPCWSTR $name$defval;",
+    ["in"]  = "$name = (LPCWSTR)lua_tostring_or_atom(L, $index);",
+    ["out"] = "-- LPCWSTR_OR_ATOM could not be used as out param --"
   },
   ["LPWSTR"] = {
 
@@ -214,27 +228,27 @@ marshall_fragments =
 
     ["declare"] = "UINT_PTR $name$defval;",
     ["in"]  = "$name = (UINT_PTR)lua_tohandle(L, $index);",
-    ["out"] = "-- handle_or_int could not be used as out param --"
+    ["out"] = "-- HANDLE_OR_UINT could not be used as out param --"
   },
   ["WPARAM"] = {
 
     ["in"]  = "$name = ($type)lua_tolwparam(L, $index);",
-    ["out"] = "lua_pushwstring(L, $name); ++numret;"
+    ["out"] = "lua_pushlightuserdata(L, (void*)$name); ++numret;"
   },
   ["LPARAM"] = {
 
     ["in"]  = "$name = ($type)lua_tolwparam(L, $index);",
-    ["out"] = "lua_pushwstring(L, $name); ++numret;"
+    ["out"] = "lua_pushlightuserdata(L, (void*)$name); ++numret;"
   },
   -- special marshaller for wrapped structs
   ["struct"] = {
     ["declare"] = "$type* $name$defval;",
-    ["in"]      = "$name = ($type*)luacwrap_checktype(L, $index, &regType_$type.hdr);",
+    ["in"]      = "$name = ($type*)g_luacwrapiface->checktype(L, $index, &regType_$type.hdr);",
 --    ["out"] = "luawrap_push(L, $name); ++numret;"
   },
   ["LUAREF"] = {
-    ["in"]  = "$name = ($type)luacwrap_createreference(L, $index);",
-    ["out"] = "luacwrap_pushreference(L, (int)$name); ++numret;",
+    ["in"]  = "$name = ($type)g_luacwrapiface->createreference(L, $index);",
+    ["out"] = "g_luacwrapiface->pushreference(L, (int)$name); ++numret;",
   },
 }
 
@@ -365,6 +379,13 @@ function marshal_param(param, dir, name, index)
       local res = expand(entry[dir], { ["type"] = typ, ["name"] = name, ["index"] = index  } )
       if (attribs.nullisvalid) then
         res = "if (!lua_isnil(L, " .. index .. "))\n  {\n    " .. res .."\n  }"
+      end
+      if (attribs.notnil) then
+        res = [[
+if (lua_isnil(L, ]] .. index .. [[))  {
+    luaL_error(L, "nil is not allowed for parameter #]] .. index .. [[");
+  }
+  ]] .. res
       end
       return res
     end

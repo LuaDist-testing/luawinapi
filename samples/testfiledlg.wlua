@@ -1,15 +1,15 @@
 --[==[
 
   luawinapi - winapi wrapper for Lua
-  Copyright (C) 2011 Klaus Oberhofer. See copyright notice in
+  Copyright (C) 2011-2016 Klaus Oberhofer. See copyright notice in
   LICENSE file
 
   Test file dialog
   
 --]==]
 
-local winapi = require("winapi")
-local bit = require("bit")
+local winapi = require("luawinapi")
+local bit = require("bit32")
 
 local bor = bit.bor
 
@@ -102,7 +102,7 @@ handlers =
       ofn.lStructSize = #ofn
       ofn.hwndOwner = hwnd
       -- ofn.hInstance;
-      ofn.lpstrFilter = _T("*.txt");
+      ofn.lpstrFilter = _T("Text Files (*.txt)\0*.txt\0All Files (*.*)\0*.*\0");
       -- ofn.lpstrCustomFilter
       -- ofn.nMaxCustFilter;
       -- ofn.nFilterIndex;
@@ -112,12 +112,15 @@ handlers =
       -- ofn.nMaxFileTitle;
       -- ofn.lpstrInitialDir;
       -- ofn.lpstrTitle;
-      -- ofn.Flags;
+      -- ofn.Flags = bor(OFN_EXPLORER, OFN_HIDEREADONLY);
       -- ofn.nFileOffset;
       -- ofn.nFileExtension;
-      -- ofn.lpstrDefExt;
+      ofn.lpstrDefExt = _T("txt");
       -- ofn.lCustData;
       local result = winapi.GetSaveFileNameW(ofn)
+      winapi.Assert(result);
+      if (result ~= 0) then
+      end
     end
     return 0
   end,
