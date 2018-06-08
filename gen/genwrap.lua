@@ -20,12 +20,12 @@ basic_types = {
   ["UINT16"]     = "$u16",
   ["INT32"]      = "$i32",
   ["UINT32"]     = "$u32",
-  
+
   ["INT"]        = "$int",
   ["UINT"]       = "$uint",
   ["ULONG"]      = "$ulong",
   ["LONG"]       = "$long",
-  
+
   ["POINTER"]    = "$ptr",
 
   ["LPCSTR"]     = "$ptr",
@@ -70,9 +70,13 @@ type_aliases = {
   ["int"]       = "INT",
 
   ["HRESULT"]   = "ULONG",
-  
+
+  ["MMRESULT"]  = "UINT",
+  ["MMVERSION"] = "UINT",
+
   ["LRESULT"]   = "ULONG",
 
+  ["DWORD_PTR"] = "DWORD",
   ["UINT_PTR"]  = "POINTER",
   ["LONG_PTR"]  = "POINTER",
   ["ULONG_PTR"] = "POINTER",
@@ -82,6 +86,7 @@ type_aliases = {
 
   ["PVOID"]     = "POINTER",
   ["LPVOID"]    = "POINTER",
+  ["LPCVOID"]   = "POINTER",
 
   ["LPINT"]     = "POINTER",
 
@@ -93,6 +98,7 @@ type_aliases = {
   ["HMODULE"]   = "HANDLE",
   ["HWND"]      = "HANDLE",
   ["HDC"]       = "HANDLE",
+  ["HRSRC"]     = "HANDLE",
   ["HMENU"]     = "HANDLE",
   ["HICON"]     = "HANDLE",
   ["HCURSOR"]   = "HANDLE",
@@ -108,11 +114,26 @@ type_aliases = {
   ["HFONT"]     = "HANDLE",
   ["HINTERNET"] = "HANDLE",
 
+  ["HGLOBAL"]   = "HANDLE",
+  ["HLOCAL"]    = "HANDLE",
+
   ["HTREEITEM"] = "HANDLE",
 
   ["HMSGQUEUE"] = "HANDLE",
 
   ["HCERTSTORE"]= "HANDLE",
+
+  ["HDRVR"]       = "HANDLE",
+  ["HWAVEOUT"]    = "HANDLE",
+  ["HWAVEIN"]     = "HANDLE",
+  ["HMIDI"]       = "HANDLE",
+  ["HMIDIOUT"]    = "HANDLE",
+
+  ["HMIDIIN"]     = "HANDLE",
+  ["HMIDISTRM"]   = "HANDLE",
+
+  ["HMIXER"]      = "HANDLE",
+  ["HMIXEROBJ"]   = "HANDLE",
 
   ["COLORREF"]  = "UINT32",
 
@@ -131,9 +152,39 @@ abstractiondefs = {
   Region = {
     handle = "HRGN"
   },
+  Icon = {
+    handle = "HICON"
+  },
   MsgQueue = {
     handle = "HMSGQUEUE",
     attribs = { ["MsgQueue"] = true }
+  },
+  Driver = {
+    handle = "HDRVR"
+  },
+  WaveOut = {
+    handle = "HWAVEOUT"
+  },
+  WaveIn = {
+    handle = "HWAVEIN"
+  },
+  Midi = {
+    handle = "HMIDI"
+  },
+  MidiOut = {
+    handle = "HMIDIOUT"
+  },
+  MidiIn = {
+    handle = "HMIDIIN"
+  },
+  MidiStream = {
+    handle = "HMIDISTRM"
+  },
+  Mixer = {
+    handle = "HMIXER"
+  },
+  MixerObject = {
+    handle = "HMIXEROBJ"
   },
 }
 
@@ -275,6 +326,10 @@ marshall_fragments =
 --    ["out"] = "luawrap_push(L, $name); ++numret;"
   },
   ["LUAREF"] = {
+    ["in"]  = "$name = ($type)g_luacwrapiface->createreference(L, $index);",
+    ["out"] = "g_luacwrapiface->pushreference(L, (int)$name); ++numret;",
+  },
+  ["PDWORD"] = {
     ["in"]  = "$name = ($type)g_luacwrapiface->createreference(L, $index);",
     ["out"] = "g_luacwrapiface->pushreference(L, (int)$name); ++numret;",
   },
@@ -426,8 +481,8 @@ end
 
 
 
-function parseStructDefs()
-  local file = assert(io.open("struct.def", "r"))
+function parseStructDefs(fname, result)
+  local file = assert(io.open(fname, "r"))
   local text = file:read("*all")
   file:close()
 
@@ -437,7 +492,6 @@ function parseStructDefs()
   -- parse all function declarations
   local structs = lpeg.match(structgrammar, text)
 
-  local result = {}
   for _, v in ipairs(structs) do
     if (result[v.name]) then
         error("struct defined twice: " .. v.name)
@@ -449,8 +503,8 @@ function parseStructDefs()
 end
 
 
-function parseFunctionDefs()
-  local file = assert(io.open("functions.def", "r"))
+function parseFunctionDefs(fname, result)
+  local file = assert(io.open(fname, "r"))
   local text = file:read("*all")
   file:close()
 
@@ -460,7 +514,6 @@ function parseFunctionDefs()
   -- parse all function declarations
   local funcs = lpeg.match(funcgrammar, text)
 
-  local result = {}
   for _, v in ipairs(funcs) do
     -- print(v.name, v.rettype)
     result[#result+1] = v
@@ -468,6 +521,58 @@ function parseFunctionDefs()
   return result
 end
 
+--
+-- Loop over all struct/union members and create types
+-- for embedded structs
+-- Anonymous structs are not supported.
+--
+function processStructMembers(types)
+    local result = { }
+    print("processStructMembers")
+
+	local function handleMembers(root, base, name)
+		for _, member in pairs(base.members or {}) do
+
+		    local curbase = name .. member.name;
+			local curname = curbase:gsub("%.", "_")
+
+			if (nil == member.typ) then
+				-- no type available -> create one
+
+				-- print(root.name, curbase, member.name, member.typ)
+
+				local typname = root.name .. "_" .. curname
+
+				-- create a new type
+				result[#result+1] = {
+				  root = root.name;
+
+  				  name = typname;
+				  base = curbase;
+
+				  -- typ  = curname;
+				  members = member.members;
+				}
+
+				-- store reference to the new type
+				member.typ = typname
+			end
+
+			handleMembers(root ,member, curname .. ".")
+		end
+	end
+
+  for _, struct in pairs(types) do
+		handleMembers(struct, struct, "")
+	end
+
+	return result
+end
+
+--
+-- Loop over all struct/union members and create types
+-- for embedded arrays
+--
 function processArrayTypes(types)
     local result = { }
     print("ProcessArrayTypes")
@@ -552,8 +657,22 @@ function createTarget(templname, targetname)
 end
 
 -- parse definitions
-structdefs = parseStructDefs()
-funcdefs   = parseFunctionDefs()
+structdefs = {}
+parseStructDefs("struct.def", structdefs)
+parseStructDefs("winmmstruct.def", structdefs)
+
+--funcdefs   = {}
+parseFunctionDefs("functions.def", funcdefs)
+parseFunctionDefs("winmmfuncs.def", funcdefs)
+
+-- process struct/union members and create new types
+embedded_structdefs = processStructMembers(structdefs)
+
+-- append res to structdefs
+-- for _, item in pairs(res) do
+--    structdefs[item.name] = item
+--end
+
 
 -- process Array types
 arraydefs  = processArrayTypes(structdefs)

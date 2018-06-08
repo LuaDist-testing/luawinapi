@@ -1,18 +1,19 @@
 //////////////////////////////////////////////////////////////////////////
 //
 // luawinapi - winapi wrapper for Lua
-// Copyright (C) 2011 Klaus Oberhofer. See copyright notice in
+// Copyright (C) 2017 Klaus Oberhofer. See copyright notice in
 // LICENSE file
 //
 //////////////////////////////////////////////////////////////////////////
 
 #include <windows.h>
+#include <mmsystem.h>
 #include <assert.h>
 
 #include "luaaux.h"
 
 #include "stdcallthunk.h"
-#include "wndproc.h"
+#include "drvproc.h"
 
 #include "gen_abstractions.h"
 
@@ -25,32 +26,29 @@
 typedef struct
 {
   lua_State* L;
-  int        objectRef;
   int        functionRef;
-  int        errFuncRef;
+  int        errFuncRef; 
   PVOID      pThunk;
-  WNDPROC    prevProc;
-} WndProcThunk;
+  DRIVERPROC prevProc;
+} DrvProcThunk;
 
-const char* WndProc_Typename  = "WndProc";
-
-
-static int winapi_WndProc_new(lua_State* L);
-static int winapi_WndProc_subclass(lua_State* L);
-
-static int winapi_WndProc_gc(lua_State* L);
-static int winapi_WndProc_index(lua_State* L);
+const char* DriverProc_Typename  = "DriverProc";
 
 
-static const luaL_Reg g_mtWndProc[] = {
-  { "__gc",    winapi_WndProc_gc },
-  { "__index", winapi_WndProc_index },
+static int winapi_DriverProc_new(lua_State* L);
+
+static int winapi_DriverProc_gc(lua_State* L);
+static int winapi_DriverProc_index(lua_State* L);
+
+
+static const luaL_Reg g_mtDriverProc[] = {
+  { "__gc",    winapi_DriverProc_gc },
+  { "__index", winapi_DriverProc_index },
   { NULL, NULL }
 };
 
-static const luaL_Reg g_WndProc_methods[ ] = {
-  { "new",      winapi_WndProc_new },
-  { "subclass", winapi_WndProc_subclass },
+static const luaL_Reg g_DriverProc_methods[ ] = {
+  { "new",     winapi_DriverProc_new },
   { NULL, NULL }
 };
 
@@ -58,10 +56,10 @@ static const luaL_Reg g_WndProc_methods[ ] = {
 //////////////////////////////////////////////////////////////////////////
 /**
 
-  Handle errors occurred while handling messages
+  Handle errors occurred while handling driver callbacks
 
 */////////////////////////////////////////////////////////////////////////
-static void raiseMsgProcError(WndProcThunk* thunk, const char* errormsg, HWND hwnd, UINT Msg, WPARAM wParam, LPARAM lParam)
+static void raiseDriverProcError(DrvProcThunk* thunk, const char* errormsg, DWORD_PTR dwDriverId, HDRVR hdrvr, UINT msg, LONG lParam1, LONG lParam2)
 {
   lua_State* L = thunk->L;
   
@@ -75,20 +73,21 @@ static void raiseMsgProcError(WndProcThunk* thunk, const char* errormsg, HWND hw
       // push parameters and
       // call lua function
       lua_pushstring (L, errormsg);
-      lua_pushWindow (L, hwnd);
-      lua_pushinteger(L, Msg);
-      lua_pushinteger(L, wParam);
-      lua_pushinteger(L, lParam);
+      lua_pushinteger(L, dwDriverId);
+      lua_pushlightuserdata(L, hdrvr);
+      lua_pushinteger(L, msg);
+      lua_pushinteger(L, lParam1);
+      lua_pushinteger(L, lParam2);
 
       lua_pcall(L, 5, 0, 0);
     }
     else
     {
       CHAR buf[4069];
-      sprintf(&buf, "Raising MSGPROC error failed. No error function available.\n%s", errormsg);
+      sprintf(&buf, "Error in DriverProc.\n%s", errormsg);
       
       MessageBoxA(NULL, buf, "Error", MB_OK);
-    
+
       PostQuitMessage(0);
     
       // pop function
@@ -111,29 +110,27 @@ static void raiseMsgProcError(WndProcThunk* thunk, const char* errormsg, HWND hw
   as parameters
 
 */////////////////////////////////////////////////////////////////////////
-static BOOL WINAPI staticWndProc(WndProcThunk* thunk, HWND hwnd, UINT Msg, WPARAM wParam, LPARAM lParam)
+static BOOL WINAPI staticDriverProc(DrvProcThunk* thunk, DWORD_PTR dwDriverId, HDRVR hdrvr, UINT msg, LONG lParam1, LONG lParam2)
 {
   int     callPrevProc = 0;
   LRESULT result = 0;
   lua_State* L = thunk->L;
 
-  // DTRACE(_T("luawrap_WndProc %x %x %x %x %x\n"), Msg, wParam, lParam, thunk, thunk->L);
-
   LUASTACK_SET(L);
 
   if (NULL == thunk->pThunk)
   {
-    raiseMsgProcError(thunk, "WndProc: Called already released thunk"
-                       , hwnd, Msg, wParam, lParam);
-    result = DefWindowProcW(hwnd, Msg, wParam, lParam);
+    raiseDriverProcError( thunk, "WndProc: Called already released thunk"
+                        , dwDriverId, hdrvr, msg, lParam1, lParam2);
+    result = DefDriverProc(dwDriverId, hdrvr, msg, lParam1, lParam2);
   }
   else
   {
     if (!lua_checkstack(L, 7))
     {
       // An error happened, print it and call default window proc
-      raiseMsgProcError(thunk, "WndProc: Growing Lua stack failed\n"
-                         , hwnd, Msg, wParam, lParam);
+      raiseDriverProcError( thunk, "WndProc: Growing Lua stack failed\n"
+                          , dwDriverId, hdrvr, msg, lParam1, lParam2);
       callPrevProc = 1;
     }
     else
@@ -147,20 +144,18 @@ static BOOL WINAPI staticWndProc(WndProcThunk* thunk, HWND hwnd, UINT Msg, WPARA
       // get table with registered WndProcs stored at env[address]
       lua_rawgeti(L, LUA_REGISTRYINDEX, thunk->functionRef);
 
-      // printf("luawrap_WndProc %x %x %x\n", thunk, hwnd, Msg);
+      // printf("DriverProc %x %x %x\n", thunk, hdrvr, msg);
       if (lua_isfunction(L, -1))
       {
         int ret;
 
         // push parameters and
         // call lua function
-        lua_pushWindow(L, hwnd);
-        lua_pushinteger(L, Msg);
-        lua_pushinteger(L, wParam);
-        lua_pushinteger(L, lParam);
-
-        // push objectref
-        lua_rawgeti(L, LUA_REGISTRYINDEX, thunk->objectRef);
+        lua_pushinteger(L, dwDriverId);
+        lua_pushlightuserdata(L, hdrvr);
+        lua_pushinteger(L, msg);
+        lua_pushinteger(L, lParam1);
+        lua_pushinteger(L, lParam2);
 
         // push prevProc pointer
         lua_pushlightuserdata(L, thunk->prevProc);
@@ -177,9 +172,9 @@ static BOOL WINAPI staticWndProc(WndProcThunk* thunk, HWND hwnd, UINT Msg, WPARA
             default:
             {
               char szError[1024];
-              sprintf(szError, "WndProc: got unsupported value type '%s'\n", luaL_typename(L, -1));
-              raiseMsgProcError(thunk, szError
-                                 , hwnd, Msg, wParam, lParam);
+              sprintf(szError, "DriverProc: got unsupported value type '%s'\n", luaL_typename(L, -1));
+              raiseDriverProcError( thunk, szError
+                                  , dwDriverId, hdrvr, msg, lParam1, lParam2);
               callPrevProc = 1;
             }
             break;
@@ -193,8 +188,8 @@ static BOOL WINAPI staticWndProc(WndProcThunk* thunk, HWND hwnd, UINT Msg, WPARA
           const char* errmsg = lua_tostring(L, -1);
           
           // An error happened, call raiseMsgProcError
-          raiseMsgProcError(thunk, errmsg
-                             , hwnd, Msg, wParam, lParam);
+          raiseDriverProcError( thunk, errmsg
+                              , dwDriverId, hdrvr, msg, lParam1, lParam2);
 
           // pop error
           lua_pop(L, 1);
@@ -205,8 +200,8 @@ static BOOL WINAPI staticWndProc(WndProcThunk* thunk, HWND hwnd, UINT Msg, WPARA
       else
       {
         // An error happened, call raiseMsgProcError
-        raiseMsgProcError(thunk, "WndProc: could not get associated function\n"
-                           , hwnd, Msg, wParam, lParam);
+        raiseDriverProcError( thunk, "WndProc: could not get associated function\n"
+                            , dwDriverId, hdrvr, msg, lParam1, lParam2);
 
         // pop function
         lua_pop(L, 1);
@@ -221,9 +216,9 @@ static BOOL WINAPI staticWndProc(WndProcThunk* thunk, HWND hwnd, UINT Msg, WPARA
 
   LUASTACK_CLEAN(L, 0);
 
-  if (callPrevProc)
+  if (callPrevProc && thunk->prevProc)
   {
-    result = CallWindowProcW(thunk->prevProc, hwnd, Msg, wParam, lParam);
+    result = thunk->prevProc(dwDriverId, hdrvr, msg, lParam1, lParam2);
   }
 
   return result;
@@ -232,10 +227,10 @@ static BOOL WINAPI staticWndProc(WndProcThunk* thunk, HWND hwnd, UINT Msg, WPARA
 //////////////////////////////////////////////////////////////////////////
 /**
 
-  implements WndProc.new(object, func)
+  implements DriverProc.new(object, func)
 
 */////////////////////////////////////////////////////////////////////////
-static int winapi_WndProc_new(lua_State* L)
+static int winapi_DriverProc_new(lua_State* L)
 {
   LUASTACK_SET(L);
 
@@ -243,35 +238,31 @@ static int winapi_WndProc_new(lua_State* L)
   {
     int errfuncspecified = !lua_isnoneornil(L, 3);
   
-    WndProcThunk* thunk = (WndProcThunk*)lua_newuserdata(L, sizeof(WndProcThunk));
+    DrvProcThunk* thunk = (DrvProcThunk*)lua_newuserdata(L, sizeof(DrvProcThunk));
     if (thunk)
     {
       // set metatable
-      luaL_getmetatable(L, WndProc_Typename);
+      luaL_getmetatable(L, DriverProc_Typename);
       lua_setmetatable(L, -2);
 
-      // register lua object in registry
-      lua_pushvalue(L, 1);
-      thunk->objectRef    = luaL_ref(L, LUA_REGISTRYINDEX);
-
       // register lua function in registry
-      luaL_checktype(L, 2, LUA_TFUNCTION); 
-      lua_pushvalue(L, 2);
+      luaL_checktype(L, 1, LUA_TFUNCTION); 
+      lua_pushvalue(L, 1);
       thunk->functionRef  = luaL_ref(L, LUA_REGISTRYINDEX);
 
       // register error function in registry
       thunk->errFuncRef   = LUA_REFNIL;
       if (errfuncspecified)
       { 
-        luaL_checktype(L, 3, LUA_TFUNCTION); 
+        luaL_checktype(L, 2, LUA_TFUNCTION); 
         
-        lua_pushvalue(L, 3);
+        lua_pushvalue(L, 2);
         thunk->errFuncRef   = luaL_ref(L, LUA_REGISTRYINDEX);
       }
 
       thunk->L            = L;
-      thunk->pThunk       = stdcallthunk_create(&staticWndProc, thunk);
-      thunk->prevProc     = &DefWindowProcW;
+      thunk->pThunk       = stdcallthunk_create(&staticDriverProc, thunk);
+      thunk->prevProc     = &DefDriverProc;
       
       LUASTACK_CLEAN(L, 1);
       return 1;
@@ -290,83 +281,16 @@ static int winapi_WndProc_new(lua_State* L)
 //////////////////////////////////////////////////////////////////////////
 /**
 
-  implements WndProc.subclass(hwnd, object, func)
-
-*/////////////////////////////////////////////////////////////////////////
-static int winapi_WndProc_subclass(lua_State* L)
-{
-  HWND hwnd;
-  WndProcThunk* thunk;
-
-  LUASTACK_SET(L);
-
-  if (lua_isfunction(L, 3))
-  {
-    hwnd = lua_toWindow(L, 1);
-    if (!IsWindow(hwnd))
-    {
-      const char *msg = lua_pushfstring(L, "Window (handle) expected but got %s", luaL_typename(L, 1));
-      luaL_argerror(L, 1, msg);
-    }
-
-    thunk = (WndProcThunk*)lua_newuserdata(L, sizeof(WndProcThunk));
-    if (thunk)
-    {
-      // set metatable
-      luaL_getmetatable(L, WndProc_Typename);
-      lua_setmetatable(L, -2);
-
-      // register lua object in registry
-      lua_pushvalue(L, 2);
-      thunk->objectRef    = luaL_ref(L, LUA_REGISTRYINDEX);
-     
-      // register lua function in registry
-      luaL_checktype(L, 3, LUA_TFUNCTION); 
-      lua_pushvalue(L, 3);
-      thunk->functionRef  = luaL_ref(L, LUA_REGISTRYINDEX);
-
-      thunk->errFuncRef   = LUA_REFNIL;
-      if (!lua_isnil(L, 4))
-      {      
-        luaL_checktype(L, 3, LUA_TFUNCTION); 
-        lua_pushvalue(L, 4);
-        thunk->errFuncRef   = luaL_ref(L, LUA_REGISTRYINDEX);
-      }
-
-      thunk->L            = L;
-      thunk->pThunk       = stdcallthunk_create(&staticWndProc, thunk);
-      thunk->prevProc     = (WNDPROC)GetWindowLongPtr(hwnd, GWLP_WNDPROC);
-      
-      // subclass
-      SetWindowLongPtr(hwnd, GWLP_WNDPROC, (LPARAM)thunk->pThunk);
-
-      LUASTACK_CLEAN(L, 1);
-      return 1;
-    }
-  }
-  else
-  {
-    const char *msg = lua_pushfstring(L, "function expected but got %s", luaL_typename(L, 3));
-    luaL_argerror(L, 3, msg);
-  }
-
-  LUASTACK_CLEAN(L, 0);
-  return 0;
-}
-
-//////////////////////////////////////////////////////////////////////////
-/**
-
   cleanup a wrapper instance
 
 */////////////////////////////////////////////////////////////////////////
-static int winapi_WndProc_gc(lua_State *L)
+static int winapi_DriverProc_gc(lua_State *L)
 {
-  WndProcThunk* thunk;
+  DrvProcThunk* thunk;
 
   LUASTACK_SET(L);
 
-  thunk = (WndProcThunk*)luaL_checkudata(L, 1, WndProc_Typename);
+  thunk = (DrvProcThunk*)luaL_checkudata(L, 1, DriverProc_Typename);
   if (thunk)
   {
     // thunk->L            = 0;
@@ -376,8 +300,6 @@ static int winapi_WndProc_gc(lua_State *L)
     stdcallthunk_destroy(thunk->pThunk);
 
     // remove registered lua object and function
-    luaL_unref(L, LUA_REGISTRYINDEX, thunk->objectRef);
-    thunk->objectRef = LUA_REFNIL;
     luaL_unref(L, LUA_REGISTRYINDEX, thunk->functionRef);
     thunk->functionRef = LUA_REFNIL;
     luaL_unref(L, LUA_REGISTRYINDEX, thunk->errFuncRef);
@@ -394,13 +316,13 @@ static int winapi_WndProc_gc(lua_State *L)
   implements __index
 
 */////////////////////////////////////////////////////////////////////////
-static int winapi_WndProc_index(lua_State* L)
+static int winapi_DriverProc_index(lua_State* L)
 {
-  WndProcThunk* thunk;
+  DrvProcThunk* thunk;
 
   LUASTACK_SET(L);
 
-  thunk = (WndProcThunk*)luaL_checkudata(L, 1, WndProc_Typename);
+  thunk = (DrvProcThunk*)luaL_checkudata(L, 1, DriverProc_Typename);
   if (thunk)
   {
     const char* index = lua_tostring(L, 2);
@@ -433,32 +355,32 @@ static int winapi_WndProc_index(lua_State* L)
 //////////////////////////////////////////////////////////////////////////
 /**
 
-  register WndProc metatable and methods
+  register DriverProc metatable and methods
 
 */////////////////////////////////////////////////////////////////////////
-int winapi_RegisterWndProc(lua_State* L)
+int winapi_RegisterDriverProc(lua_State* L)
 {
   LUASTACK_SET(L);
 
-  // create metatable for WndProc objects and store it in registry
-  luaL_newmetatable(L, WndProc_Typename);
+  // create metatable for DriverProc objects and store it in registry
+  luaL_newmetatable(L, DriverProc_Typename);
 #if (LUA_VERSION_NUM > 501)
-  luaL_setfuncs(L, g_mtWndProc, 0);
+  luaL_setfuncs(L, g_mtDriverProc, 0);
 #else
-  luaL_openlib(L, NULL, g_mtWndProc, 0);
+  luaL_openlib(L, NULL, g_mtDriverProc, 0);
 #endif
   lua_pop(L, 1);
 
   // create method table
   lua_newtable(L);
 #if (LUA_VERSION_NUM > 501)
-  luaL_setfuncs(L, g_WndProc_methods, 0);
+  luaL_setfuncs(L, g_DriverProc_methods, 0);
 #else
-  luaL_openlib(L, NULL, g_WndProc_methods, 0);
+  luaL_openlib(L, NULL, g_DriverProc_methods, 0);
 #endif
 
   // store
-  lua_setfield(L, -2, WndProc_Typename);
+  lua_setfield(L, -2, DriverProc_Typename);
 
   LUASTACK_CLEAN(L, 0);
   return 0;

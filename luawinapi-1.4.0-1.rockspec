@@ -2,17 +2,17 @@
 
 package = "luawinapi"
 
-version = "1.3.0-1"
+version = "1.4.0-1"
 
 -- LuaDist source
 source = {
-  tag = "1.3.0-1",
+  tag = "1.4.0-1",
   url = "git://github.com/LuaDist-testing/luawinapi.git"
 }
 -- Original source
 -- source = {
 --     url = "git://github.com/oberhofer/luawinapi.git",
---     tag = "v1.3.0"
+--     tag = "v1.4.0"
 -- }
 
 description = {
@@ -55,10 +55,11 @@ local function make_plat(plat)
                   "src/luaaux.c",
                   "src/stdcallthunk.c",
                   "src/luawinapi.c",
-                  "src/wndproc.c"
+                  "src/wndproc.c",
+                  "src/drvproc.c",
                 },
       defines = defines[plat],
-      libraries = { "kernel32", "user32", "gdi32", "comctl32", "comdlg32", "Msimg32" },
+      libraries = { "kernel32", "user32", "gdi32", "comctl32", "comdlg32", "Msimg32", "shell32", "winmm" },
       -- luacwrap.h should be there
       incdirs = { "$(LUACWRAP_INCDIR)" },
       -- luaxx.lib/.a/.dll should be there

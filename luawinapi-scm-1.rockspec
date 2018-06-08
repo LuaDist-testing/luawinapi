@@ -47,10 +47,11 @@ local function make_plat(plat)
                   "src/luaaux.c",
                   "src/stdcallthunk.c",
                   "src/luawinapi.c",
-                  "src/wndproc.c"
+                  "src/wndproc.c",
+                  "src/drvproc.c",
                 },
       defines = defines[plat],
-      libraries = { "kernel32", "user32", "gdi32", "comctl32", "comdlg32", "Msimg32" },
+      libraries = { "kernel32", "user32", "gdi32", "comctl32", "comdlg32", "Msimg32", "shell32", "winmm" },
       -- luacwrap.h should be there
       incdirs = { "$(LUACWRAP_INCDIR)" },
       -- luaxx.lib/.a/.dll should be there
